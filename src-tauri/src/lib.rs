@@ -18,9 +18,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::backup,
+            commands::generate_backup_code,
             commands::export_manifest,
             commands::recover_with_password,
             commands::recover_with_shares,
+            commands::save_recovered,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

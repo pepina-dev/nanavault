@@ -1,12 +1,14 @@
 <script lang="ts">
   import { app, go } from "../store.svelte";
+  import { THRESHOLD, SHARE_COUNT } from "../api";
   import Icon from "./Icon.svelte";
   import FlowHeader from "./FlowHeader.svelte";
   import Avatar from "./Avatar.svelte";
 
   let open = $state(0); // which key card is expanded
-  let revealed = $state<boolean[]>([false, false, false]);
+  let revealed = $state<boolean[]>(Array(SHARE_COUNT).fill(false));
   let copied = $state(-1);
+  let copyFailed = $state(-1);
 
   const shares = $derived(app.outcome?.shares ?? []);
 
@@ -15,12 +17,15 @@
   }
 
   async function copyShare(i: number) {
+    copyFailed = -1;
     try {
       await navigator.clipboard.writeText(shares[i]);
       copied = i;
       setTimeout(() => (copied = copied === i ? -1 : copied), 1600);
     } catch {
-      /* clipboard unavailable */
+      // clipboard unavailable — tell the user so they can copy it by hand
+      copyFailed = i;
+      setTimeout(() => (copyFailed = copyFailed === i ? -1 : copyFailed), 3000);
     }
   }
 
@@ -31,32 +36,42 @@
   }
 
   const handedOut = $derived(app.guardians.filter((g) => g.shared).length);
-  const allShared = $derived(
-    app.guardians.every((g) => g.hint.trim().length > 0 && g.shared),
+  // Naming each person is just a memory aid (avatar + label), never used in the
+  // crypto — so handing out every code is all it takes to finish.
+  const allShared = $derived(app.guardians.every((g) => g.shared));
+
+  // Wording + step dots follow the chosen recovery mode.
+  const protectVerb = $derived(
+    app.recoveryMode === "easy" ? "protect" : "encrypt",
+  );
+  const total = 5;
+  const secretScreen = $derived(
+    app.recoveryMode === "easy" ? "backup-code" : "password",
   );
 </script>
 
 <div class="card">
   <FlowHeader
     label="Keep something safe"
-    total={4}
-    current={3}
-    onBack={() => go("password")}
+    {total}
+    current={total - 1}
+    onBack={() => go(secretScreen)}
   />
 
-  {#if shares.length < 3}
+  {#if shares.length < SHARE_COUNT}
     <div class="icon-badge"><Icon name="users" size={26} /></div>
-    <h2>Let's seal your file first</h2>
-    <p class="lead">We need to seal your file before handing out keys.</p>
-    <button class="btn" style="margin-top:20px;" onclick={() => go("password")}>
+    <h2>Let's {protectVerb} your file first</h2>
+    <p class="lead">We need to {protectVerb} your file before handing out keys.</p>
+    <button class="btn" style="margin-top:20px;" onclick={() => go(secretScreen)}>
       <Icon name="arrow-left" /> Go back
     </button>
   {:else}
     <h2>Hand out the keys</h2>
     <p class="lead">
-      Each person gets one <strong>recovery key</strong> — a list of words. Read
-      it out or copy it across however you trust most. Any
-      <strong>2 of 3</strong> can bring your secret file back — one alone can't.
+      Each person gets one <strong>recovery code</strong> — a list of words.
+      Read it out or copy it across however you trust most. Any
+      <strong>{THRESHOLD} of {SHARE_COUNT}</strong> can bring your secret file back
+      — one alone can't.
     </p>
 
     <div class="stack" style="gap: 11px; margin-top: 22px;">
@@ -69,7 +84,7 @@
                 {g.hint.trim() || `Person ${i + 1}`}
               </div>
               <div class="muted" style="font-size:0.82rem;">
-                Recovery key {i + 1} of 3
+                Recovery code {i + 1} of {SHARE_COUNT}
               </div>
             </div>
             {#if g.shared}
@@ -106,16 +121,17 @@
                 <div
                   style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;"
                 >
-                  <span class="eyebrow">Recovery key</span>
+                  <span class="eyebrow">Recovery code</span>
                 </div>
                 {#if revealed[i]}
                   <div class="mnemonic">{shares[i]}</div>
                 {:else}
                   <button
+                    type="button"
                     class="words-hidden"
                     onclick={() => (revealed[i] = true)}
                   >
-                    <Icon name="eye" size={18} /> Tap to show the recovery key
+                    <Icon name="eye" size={18} /> Tap to show the recovery code
                   </button>
                 {/if}
               </div>
@@ -127,17 +143,28 @@
                 <span style="display:inline-flex; margin-top:2px;"
                   ><Icon name="shield" size={14} /></span
                 >
-                One key alone opens nothing — it takes any 2 together. Safe to give
-                to {g.hint.trim().split(" ")[0] || "them"}.
+                One key alone opens nothing — it takes any {THRESHOLD} together.
+                Safe to give to {g.hint.trim().split(" ")[0] || "them"}.
               </p>
 
-              <button class="btn btn-dark" onclick={() => copyShare(i)}>
+              <button
+                type="button"
+                class="btn btn-dark"
+                onclick={() => copyShare(i)}
+              >
                 <Icon name={copied === i ? "check" : "file"} size={18} />
                 {copied === i ? "Copied" : "Copy key"}
               </button>
+              {#if copyFailed === i}
+                <p class="muted" style="margin:8px 0 0; font-size:0.82rem;">
+                  Couldn't copy automatically — tap the words above to select
+                  them, then copy by hand.
+                </p>
+              {/if}
 
               {#if !g.shared}
                 <button
+                  type="button"
                   class="btn"
                   style="margin-top:12px;"
                   onclick={() => give(i)}
@@ -154,13 +181,13 @@
     <div class="note-sunken" style="align-items:center; margin-top:18px;">
       <div style="flex:1;">
         <div style="font-weight:700; color:var(--fg); margin-bottom:6px;">
-          {handedOut} of 3 keys handed out
+          {handedOut} of {SHARE_COUNT} keys handed out
         </div>
         <div
           style="height:6px; border-radius:999px; background:var(--border); overflow:hidden;"
         >
           <div
-            style="height:100%; width:{(handedOut / 3) *
+            style="height:100%; width:{(handedOut / SHARE_COUNT) *
               100}%; background:{allShared
               ? 'var(--success)'
               : 'var(--rose)'}; border-radius:999px; transition:width .4s ease;"

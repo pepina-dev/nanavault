@@ -49,6 +49,14 @@ export function baseName(path: string): string {
 
 // --- backend commands (one wrapper each; arg names match commands.rs) ------
 
+/** Easy mode: mint a fresh backup code on the backend — a SLIP-0039 word
+ *  mnemonic (the same format as the guardians' recovery codes). Key generation
+ *  is a secret operation, so it lives in Rust. The caller shows the code to the
+ *  user and passes it straight back to `backup` in place of an nsec. */
+export function generateBackupCode(): Promise<string> {
+  return invoke<string>("generate_backup_code");
+}
+
 export function backup(
   nsec: string,
   password: string,
@@ -69,34 +77,39 @@ export function exportManifest(manifest: Manifest, path: string): Promise<void> 
   return invoke<void>("export_manifest", { manifest, path });
 }
 
-/** Recover into `outputDir`; the file keeps its original name. Returns the full
- *  path it was written to. */
+/** Recover the file to a temporary location and return that path. The user
+ *  picks where to keep it afterwards via `saveRecovered`. */
 export function recoverWithPassword(
   nsec: string,
   password: string,
-  outputDir: string,
   manifestPath?: string,
 ): Promise<string> {
   return invoke<string>("recover_with_password", {
     nsec,
     password,
-    outputDir,
     relays: DEFAULT_RELAYS,
     manifestPath: manifestPath ?? null,
   });
 }
 
-/** Recover into `outputDir`; the file keeps its original name. Returns the full
- *  path it was written to. */
+/** Recover the file to a temporary location and return that path. The user
+ *  picks where to keep it afterwards via `saveRecovered`. */
 export function recoverWithShares(
   shares: string[],
-  outputDir: string,
   manifestPath?: string,
 ): Promise<string> {
   return invoke<string>("recover_with_shares", {
     shares,
-    outputDir,
     relays: DEFAULT_RELAYS,
     manifestPath: manifestPath ?? null,
   });
+}
+
+/** Move a just-recovered file from its temp location into the folder the user
+ *  chose, keeping its name. Returns the final path. */
+export function saveRecovered(
+  sourcePath: string,
+  outputDir: string,
+): Promise<string> {
+  return invoke<string>("save_recovered", { sourcePath, outputDir });
 }

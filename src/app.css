@@ -107,6 +107,16 @@ p {
   position: relative;
 }
 
+/* A flat, left-aligned card nested inside another card (the checklist on the
+   working screen, the summary on the success screen). */
+.card-inset {
+  text-align: left;
+  padding: 6px 20px;
+  box-shadow: none;
+  border-color: var(--border);
+  animation: none;
+}
+
 .lead {
   font-size: 1.05rem;
   color: var(--fg-muted);
@@ -229,6 +239,17 @@ button {
 }
 .btn-dark:hover:not(:disabled) {
   background: #262626;
+  transform: translateY(-1px);
+}
+
+/* success solid (green) — confirms a completed action */
+.btn-success {
+  background: var(--success);
+  color: #fff;
+  box-shadow: none;
+}
+.btn-success:hover:not(:disabled) {
+  background: #047857;
   transform: translateY(-1px);
 }
 

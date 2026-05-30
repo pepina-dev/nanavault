@@ -2,6 +2,8 @@
   import { app } from "$lib/store.svelte";
   import Home from "$lib/components/Home.svelte";
   import ProtectUpload from "$lib/components/ProtectUpload.svelte";
+  import RecoveryModePick from "$lib/components/RecoveryModePick.svelte";
+  import BackupCode from "$lib/components/BackupCode.svelte";
   import NsecKey from "$lib/components/NsecKey.svelte";
   import MasterPassword from "$lib/components/MasterPassword.svelte";
   import Working from "$lib/components/Working.svelte";
@@ -16,6 +18,10 @@
     <Home />
   {:else if app.screen === "protect"}
     <ProtectUpload />
+  {:else if app.screen === "mode"}
+    <RecoveryModePick />
+  {:else if app.screen === "backup-code"}
+    <BackupCode />
   {:else if app.screen === "nsec"}
     <NsecKey />
   {:else if app.screen === "password"}
