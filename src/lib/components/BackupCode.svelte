@@ -8,7 +8,6 @@
 
   let loading = $state(true);
   let genError = $state("");
-  let revealed = $state(false);
   let copied = $state(false);
   let copyFailed = $state(false);
 
@@ -80,40 +79,21 @@
       <Icon name="arrow-left" /> Back to recovery modes
     </button>
   {:else}
-    <div class="note" style="margin-top:20px; padding:16px;">
-      <div
-        style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;"
-      >
-        <span class="eyebrow">Your backup code</span>
-      </div>
-      {#if revealed}
-        <div class="mnemonic">{app.backupCode}</div>
-      {:else}
-        <button
-          type="button"
-          class="words-hidden"
-          onclick={() => (revealed = true)}
-        >
-          <Icon name="eye" size={18} /> Tap to show your backup code
+    <div class="note" style="margin-top:20px; padding:12px 16px;">
+      <div style="display:flex; justify-content:flex-end;">
+        <button type="button" class="copy-link" onclick={copy}>
+          <Icon name={copied ? "check" : "copy"} size={13} />
+          {copied ? "Copied" : "Copy"}
         </button>
-      {/if}
-
-      <button
-        type="button"
-        class="btn btn-dark"
-        style="margin-top:14px;"
-        onclick={copy}
-      >
-        <Icon name={copied ? "check" : "file"} size={18} />
-        {copied ? "Copied" : "Copy backup code"}
-      </button>
-      {#if copyFailed}
-        <p class="muted" style="margin:8px 0 0; font-size:0.82rem;">
-          Couldn't copy automatically — tap the code above to select it, then
-          copy by hand.
-        </p>
-      {/if}
+      </div>
+      <div class="mnemonic" style="margin-top:4px;">{app.backupCode}</div>
     </div>
+    {#if copyFailed}
+      <p class="muted" style="margin:8px 0 0; font-size:0.82rem;">
+        Couldn't copy automatically — tap the code above to select it, then copy
+        by hand.
+      </p>
+    {/if}
 
     <label class="confirm-row">
       <input type="checkbox" bind:checked={app.backupCodeSaved} />
@@ -148,24 +128,23 @@
     word-break: break-word;
     user-select: all;
   }
-  .words-hidden {
-    width: 100%;
-    display: flex;
+  .copy-link {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 16px;
-    border: 1px dashed var(--border);
-    border-radius: var(--r-md);
-    background: var(--bg);
+    gap: 7px;
+    padding: 0;
+    background: none;
+    border: none;
     color: var(--fg-muted);
     font-weight: 700;
-    font-size: 0.9rem;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
     cursor: pointer;
   }
-  .words-hidden:hover {
-    color: var(--rose);
-    border-color: var(--rose);
+  .copy-link:hover {
+    color: var(--fg);
+    text-decoration: underline;
   }
   .confirm-row {
     display: flex;
