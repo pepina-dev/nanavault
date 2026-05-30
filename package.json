@@ -1,7 +1,7 @@
 {
-  "name": "auntiejane",
+  "name": "nanavault",
   "version": "0.1.0",
-  "description": "The auntiejane desktop application",
+  "description": "The NanaVault desktop application",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
