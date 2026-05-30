@@ -64,18 +64,6 @@
     <div class="error">Oh dear, the two passwords don't match yet.</div>
   {/if}
 
-  <div style="margin-top: 18px;">
-    <ReassureNote icon="shield">
-      {#if easy}
-        You'll need both your backup code and this password to recover the file
-        on your own — or any <b>2 of your 3 people</b> can help.
-      {:else}
-        You'll need both your key and this password to recover the file on your
-        own — or any <b>2 of your 3 people</b> can help.
-      {/if}
-    </ReassureNote>
-  </div>
-
   <button
     class="btn"
     style="margin-top: 26px;"

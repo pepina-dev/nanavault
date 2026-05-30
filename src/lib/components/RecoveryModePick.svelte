@@ -25,27 +25,20 @@
     onBack={() => go("protect")}
   />
 
-  <h2>Do you have a NOSTR identity?</h2>
+  <h2>Do you use NOSTR?</h2>
   <div class="stack" style="gap: 12px; margin-top: 22px;">
     <button
       type="button"
       class="mode-card {app.recoveryMode === 'easy' ? 'on' : ''}"
       onclick={() => pick("easy")}
     >
-      <span class="mode-ic"><Icon name="heart" size={22} /></span>
+      <span class="mode-radio" aria-hidden="true"></span>
       <span class="mode-body">
         <span class="mode-title"> I have no idea what NOSTR is </span>
         <span class="mode-text">
           Don't worry, we can still protect your secret and give you a recovery
           mode.
         </span>
-      </span>
-      <span class="mode-check">
-        {#if app.recoveryMode === "easy"}<Icon
-            name="check"
-            size={15}
-            stroke={2.6}
-          />{/if}
       </span>
     </button>
 
@@ -54,20 +47,13 @@
       class="mode-card {app.recoveryMode === 'advanced' ? 'on' : ''}"
       onclick={() => pick("advanced")}
     >
-      <span class="mode-ic"><Icon name="key" size={22} /></span>
+      <span class="mode-radio" aria-hidden="true"></span>
       <span class="mode-body">
-        <span class="mode-title">Yes, I have one</span>
+        <span class="mode-title">Yes, I have a NOSTR identity</span>
         <span class="mode-text">
           Great! If you don't want to enter your nsec, pretend you don't have
           idea what NOSTR is
         </span>
-      </span>
-      <span class="mode-check">
-        {#if app.recoveryMode === "advanced"}<Icon
-            name="check"
-            size={15}
-            stroke={2.6}
-          />{/if}
       </span>
     </button>
   </div>
@@ -97,20 +83,26 @@
     border-color: var(--rose);
     background: var(--card);
   }
-  .mode-ic {
-    display: inline-flex;
+  .mode-radio {
     flex: none;
-    width: 44px;
-    height: 44px;
-    align-items: center;
-    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
     border-radius: 50%;
-    background: var(--card);
-    color: var(--rose);
+    border: 2px solid var(--border-strong);
+    background: var(--bg);
+    position: relative;
+    transition: border-color 0.15s;
   }
-  .mode-card.on .mode-ic {
+  .mode-card.on .mode-radio {
+    border-color: var(--rose);
+  }
+  .mode-card.on .mode-radio::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
     background: var(--rose);
-    color: var(--bg);
   }
   .mode-body {
     display: flex;
@@ -131,16 +123,5 @@
     font-size: 0.88rem;
     line-height: 1.5;
     color: var(--fg-muted);
-  }
-  .mode-check {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    margin-top: 2px;
-    border-radius: 50%;
-    color: var(--rose);
   }
 </style>
