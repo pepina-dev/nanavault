@@ -72,6 +72,17 @@ pub enum Error {
     #[error("recovery manifest error: {0}")]
     Manifest(String),
 
+    /// Recovery could not find an unused name for the file in the destination
+    /// folder, even after trying many numbered variants.
+    #[error("could not find an available name for {0:?} in the destination folder")]
+    DestinationUnavailable(String),
+
+    /// The key rederived from the password (or reconstructed from the shares)
+    /// does not match the identity the manifest was made with — the wrong master
+    /// key, password, or shares for this backup.
+    #[error("the key or password does not match this recovery manifest")]
+    ManifestKeyMismatch,
+
     /// Reading the plaintext file or writing the recovered file failed.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),

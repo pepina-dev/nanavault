@@ -8,6 +8,7 @@
 //! comes from the password derivation or from the Shamir shares. The
 //! `carries_no_secret_material` test guards that invariant.
 
+use nostr::PublicKey;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::cipher::{CipherId, CIPHER};
@@ -23,6 +24,12 @@ pub struct Manifest {
     pub descriptor: BackupDescriptor,
     /// The relays the pointer was published to.
     pub relays: Vec<String>,
+    /// The public identity that authored the pointer. Recovery rederives the key
+    /// and checks it against this before doing any work, so a wrong key or
+    /// password is rejected immediately rather than after downloading the blob.
+    /// This is public, not secret — it is already the pointer's author on the
+    /// relays.
+    pub derived_pubkey: PublicKey,
     /// Size of the encrypted blob, in bytes. Informational.
     pub blob_size: u64,
     /// The AEAD used for the blob. Self-descriptive only — the blob's own header
@@ -37,12 +44,14 @@ impl Manifest {
     pub fn new(
         descriptor: BackupDescriptor,
         relays: Vec<String>,
+        derived_pubkey: PublicKey,
         blob_size: u64,
         kdf: KdfParams,
     ) -> Self {
         Self {
             descriptor,
             relays,
+            derived_pubkey,
             blob_size,
             cipher: CIPHER,
             kdf,
@@ -65,6 +74,7 @@ mod tests {
     use super::*;
     use crate::crypto::cipher::BlobHash;
     use crate::metadata::Filename;
+    use nostr::Keys;
 
     fn manifest() -> Manifest {
         let descriptor = BackupDescriptor::new(
@@ -75,6 +85,7 @@ mod tests {
         Manifest::new(
             descriptor,
             vec!["wss://relay.example".into()],
+            Keys::generate().public_key(),
             2048,
             KdfParams::default(),
         )
@@ -92,7 +103,8 @@ mod tests {
         // Every field, at the top level and inside the nested descriptor, must
         // be drawn from these non-secret allowlists. If anyone ever adds a
         // secret field, this fails.
-        const ALLOWED_TOP: &[&str] = &["descriptor", "relays", "blob_size", "cipher", "kdf"];
+        const ALLOWED_TOP: &[&str] =
+            &["descriptor", "relays", "derived_pubkey", "blob_size", "cipher", "kdf"];
         const ALLOWED_DESCRIPTOR: &[&str] = &["v", "blob_sha256", "servers", "filename"];
 
         let value: serde_json::Value = serde_json::from_str(&manifest().to_json().unwrap()).unwrap();

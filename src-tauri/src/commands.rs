@@ -91,12 +91,12 @@ pub async fn recover_with_password(
         manifest.as_ref(),
         &factory,
         &store,
-        |filename| create_in(&output_dir, filename),
+        Path::new(&output_dir),
     )
     .await;
 
     store.shutdown().await;
-    Ok(saved_path(&output_dir, &result?))
+    Ok(result?.to_string_lossy().into_owned())
 }
 
 /// Recover the backup from a quorum of Shamir shares into `output_dir`, using the
@@ -119,27 +119,12 @@ pub async fn recover_with_shares(
         manifest.as_ref(),
         &factory,
         &store,
-        |filename| create_in(&output_dir, filename),
+        Path::new(&output_dir),
     )
     .await;
 
     store.shutdown().await;
-    Ok(saved_path(&output_dir, &result?))
-}
-
-/// Create the recovered file inside `output_dir` under its original name.
-fn create_in(output_dir: &str, filename: &Filename) -> Result<std::fs::File> {
-    Ok(std::fs::File::create(
-        Path::new(output_dir).join(filename.as_str()),
-    )?)
-}
-
-/// The full path a recovered file was written to, for reporting back to the UI.
-fn saved_path(output_dir: &str, filename: &Filename) -> String {
-    Path::new(output_dir)
-        .join(filename.as_str())
-        .to_string_lossy()
-        .into_owned()
+    Ok(result?.to_string_lossy().into_owned())
 }
 
 /// Read and parse a recovery manifest from disk, if a path was given.
