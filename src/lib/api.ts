@@ -3,7 +3,7 @@
 // renders the result. Every secret operation happens in src-tauri/.
 
 import { invoke } from "@tauri-apps/api/core";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 
 // --- backend types (mirror src-tauri) --------------------------------------
 
@@ -34,9 +34,12 @@ export async function pickFile(): Promise<string | null> {
   return typeof picked === "string" ? picked : null;
 }
 
-/** Pick where to write a recovered file. Returns the path, or null. */
-export function pickSaveAs(defaultPath?: string): Promise<string | null> {
-  return save({ defaultPath });
+/** Pick the folder to write a recovered file into. The file keeps the name it
+ *  was backed up under, so we choose a directory, not a full path. Returns the
+ *  directory, or null if cancelled. */
+export async function pickOutputDir(): Promise<string | null> {
+  const picked = await open({ directory: true, multiple: false });
+  return typeof picked === "string" ? picked : null;
 }
 
 /** The file name portion of a path, for display only. */
@@ -66,29 +69,33 @@ export function exportManifest(manifest: Manifest, path: string): Promise<void> 
   return invoke<void>("export_manifest", { manifest, path });
 }
 
+/** Recover into `outputDir`; the file keeps its original name. Returns the full
+ *  path it was written to. */
 export function recoverWithPassword(
   nsec: string,
   password: string,
-  outputPath: string,
+  outputDir: string,
   manifestPath?: string,
-): Promise<void> {
-  return invoke<void>("recover_with_password", {
+): Promise<string> {
+  return invoke<string>("recover_with_password", {
     nsec,
     password,
-    outputPath,
+    outputDir,
     relays: DEFAULT_RELAYS,
     manifestPath: manifestPath ?? null,
   });
 }
 
+/** Recover into `outputDir`; the file keeps its original name. Returns the full
+ *  path it was written to. */
 export function recoverWithShares(
   shares: string[],
-  outputPath: string,
+  outputDir: string,
   manifestPath?: string,
-): Promise<void> {
-  return invoke<void>("recover_with_shares", {
+): Promise<string> {
+  return invoke<string>("recover_with_shares", {
     shares,
-    outputPath,
+    outputDir,
     relays: DEFAULT_RELAYS,
     manifestPath: manifestPath ?? null,
   });
