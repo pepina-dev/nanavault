@@ -1,6 +1,6 @@
 # NanaVault
 
-⚠️ Vibecoded hackathon project for AOS, please don't use it with real secrets
+⚠️ Vibecoded project for AOS hackathon, don't use it with real secrets
 
 Encrypted, recoverable file backups on [nostr](https://nostr.com) +
 [Blossom](https://github.com/hzrd149/blossom), with social recovery.
