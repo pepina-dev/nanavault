@@ -109,7 +109,7 @@
               </button>
 
               {#if !g.shared}
-                <button class="btn" style="margin-top:12px;" disabled={!revealed[i]} onclick={() => give(i)}>
+                <button class="btn" style="margin-top:12px;" onclick={() => give(i)}>
                   <Icon name="check" /> Mark as given
                 </button>
               {/if}
