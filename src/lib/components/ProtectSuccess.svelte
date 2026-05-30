@@ -14,9 +14,7 @@
   const sealedAdj = $derived(
     app.recoveryMode === "easy" ? "Protected" : "Encrypted",
   );
-  const keyNoun = $derived(
-    app.recoveryMode === "easy" ? "backup code" : "key",
-  );
+  const keyNoun = $derived(app.recoveryMode === "easy" ? "backup code" : "key");
 
   function home() {
     resetProtect();
@@ -35,7 +33,7 @@
   <p class="lead">
     <strong style="color:var(--fg);">{fileName}</strong>
     is {sealedAdj.toLowerCase()} and split into
-    {SHARE_COUNT} keys — findable only by you.
+    {SHARE_COUNT} keys shared with people you trust.
   </p>
 
   <div class="card card-inset" style="margin:20px 0;">

@@ -72,7 +72,7 @@
             for={`share-${i}`}
             style="display:flex; align-items:center; gap:8px;"
           >
-            Friend {i + 1}'s recovery code
+            Person {i + 1}'s recovery code
             {#if app.shareEntries[i].trim().length > 0}
               <span
                 class="pill pill-success"
