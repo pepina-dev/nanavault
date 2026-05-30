@@ -5,6 +5,8 @@
 //! held only for the duration of the call; the `nsec` is wrapped so its buffer
 //! is wiped on return.
 
+use std::path::Path;
+
 use zeroize::Zeroizing;
 
 use crate::backup::{self, BackupOutcome};
@@ -12,6 +14,7 @@ use crate::blossom::BlossomStoreFactory;
 use crate::crypto::kdf::{self, KdfParams};
 use crate::error::Result;
 use crate::manifest::Manifest;
+use crate::metadata::Filename;
 use crate::recover;
 use crate::relay::RelayStore;
 use crate::secret::{MasterKey, Password};
@@ -38,9 +41,11 @@ pub async fn backup(
     let store = RelayStore::connect(relays).await?;
 
     let plaintext = std::fs::File::open(&file_path)?;
+    let filename = Filename::from_path(&file_path)?;
     let outcome = backup::run_backup(
         &derived,
         plaintext,
+        filename,
         &servers,
         threshold,
         share_count,
@@ -61,17 +66,17 @@ pub fn export_manifest(manifest: Manifest, path: String) -> Result<()> {
     Ok(())
 }
 
-/// Recover the backup with the master key and password, writing the plaintext to
-/// `output_path`. Uses the manifest at `manifest_path` if given, otherwise the
-/// relays.
+/// Recover the backup with the master key and password into `output_dir`, using
+/// the file's original name. Uses the manifest at `manifest_path` if given,
+/// otherwise the relays. Returns the full path the file was written to.
 #[tauri::command]
 pub async fn recover_with_password(
     nsec: String,
     password: String,
-    output_path: String,
+    output_dir: String,
     relays: Vec<String>,
     manifest_path: Option<String>,
-) -> Result<()> {
+) -> Result<String> {
     let nsec = Zeroizing::new(nsec);
     let params = KdfParams::default();
     let manifest = load_manifest(manifest_path)?;
@@ -79,7 +84,6 @@ pub async fn recover_with_password(
     let factory = BlossomStoreFactory::read_only();
     let store = RelayStore::connect(relays).await?;
 
-    let output = std::fs::File::create(&output_path)?;
     let result = recover::recover_with_password(
         &nsec,
         &password,
@@ -87,34 +91,55 @@ pub async fn recover_with_password(
         manifest.as_ref(),
         &factory,
         &store,
-        output,
+        |filename| create_in(&output_dir, filename),
     )
     .await;
 
     store.shutdown().await;
-    result
+    Ok(saved_path(&output_dir, &result?))
 }
 
-/// Recover the backup from a quorum of Shamir shares, writing the plaintext to
-/// `output_path`. The master key and password are not needed.
+/// Recover the backup from a quorum of Shamir shares into `output_dir`, using the
+/// file's original name. The master key and password are not needed. Returns the
+/// full path the file was written to.
 #[tauri::command]
 pub async fn recover_with_shares(
     shares: Vec<String>,
-    output_path: String,
+    output_dir: String,
     relays: Vec<String>,
     manifest_path: Option<String>,
-) -> Result<()> {
+) -> Result<String> {
     let manifest = load_manifest(manifest_path)?;
 
     let factory = BlossomStoreFactory::read_only();
     let store = RelayStore::connect(relays).await?;
 
-    let output = std::fs::File::create(&output_path)?;
-    let result =
-        recover::recover_with_shares(&shares, manifest.as_ref(), &factory, &store, output).await;
+    let result = recover::recover_with_shares(
+        &shares,
+        manifest.as_ref(),
+        &factory,
+        &store,
+        |filename| create_in(&output_dir, filename),
+    )
+    .await;
 
     store.shutdown().await;
-    result
+    Ok(saved_path(&output_dir, &result?))
+}
+
+/// Create the recovered file inside `output_dir` under its original name.
+fn create_in(output_dir: &str, filename: &Filename) -> Result<std::fs::File> {
+    Ok(std::fs::File::create(
+        Path::new(output_dir).join(filename.as_str()),
+    )?)
+}
+
+/// The full path a recovered file was written to, for reporting back to the UI.
+fn saved_path(output_dir: &str, filename: &Filename) -> String {
+    Path::new(output_dir)
+        .join(filename.as_str())
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// Read and parse a recovery manifest from disk, if a path was given.

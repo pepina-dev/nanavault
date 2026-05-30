@@ -46,6 +46,11 @@ pub enum Error {
     #[error("secret sharing: {0}")]
     Shamir(#[from] crate::crypto::slip39::Error),
 
+    /// A file name was empty, contained a path separator, or otherwise could
+    /// not stand in as a single, safe destination name.
+    #[error("invalid file name: {0}")]
+    InvalidFilename(String),
+
     /// Building or reading the encrypted pointer event failed.
     #[error("backup pointer error: {0}")]
     Pointer(String),

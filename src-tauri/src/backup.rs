@@ -16,7 +16,7 @@ use crate::crypto::kdf::{self, KdfParams};
 use crate::crypto::slip39;
 use crate::error::{Error, Result};
 use crate::manifest::Manifest;
-use crate::metadata::{self, BackupDescriptor};
+use crate::metadata::{self, BackupDescriptor, Filename};
 use crate::relay::MetadataStore;
 use crate::secret::DerivedKey;
 
@@ -41,11 +41,13 @@ pub struct BackupOutcome {
 /// The caller derives the key (and so owns the master key and password); this
 /// keeps key derivation out of the orchestration layer and lets the caller
 /// build the authorized Blossom factory from the same key without deriving it
-/// twice. `kdf_params` is recorded in the descriptor and manifest.
+/// twice. `filename` is the original name of the file, recorded so recovery can
+/// restore it; `kdf_params` is recorded in the manifest for transparency.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_backup<F, M>(
     derived: &DerivedKey,
     plaintext: impl Read,
+    filename: Filename,
     servers: &[String],
     threshold: u8,
     share_count: u8,
@@ -61,11 +63,11 @@ where
 
     let blob = cipher::encrypt(&file_key, plaintext)?;
     let blob_hash = BlobHash::of(&blob);
+    let blob_size = blob.len() as u64;
 
     let stored_servers = upload(&blob, servers, blob_factory).await?;
 
-    let descriptor =
-        BackupDescriptor::new(blob_hash, blob.len() as u64, stored_servers, *kdf_params);
+    let descriptor = BackupDescriptor::new(blob_hash, stored_servers, filename);
     let pointer = metadata::build_pointer(&descriptor, derived)?;
     metadata_store.publish(&pointer).await?;
 
@@ -81,7 +83,7 @@ where
         derived_npub,
         blob_sha256: blob_hash.to_hex(),
         shares,
-        manifest: Manifest::new(descriptor, metadata_store.relays()),
+        manifest: Manifest::new(descriptor, metadata_store.relays(), blob_size, *kdf_params),
     })
 }
 
@@ -146,6 +148,7 @@ mod tests {
         let outcome = run_backup(
             &derived(),
             Cursor::new(b"my important file".to_vec()),
+            Filename::parse("important.txt").unwrap(),
             &servers,
             2,
             3,
@@ -158,6 +161,10 @@ mod tests {
 
         assert_eq!(outcome.shares.len(), 3);
         assert_eq!(outcome.manifest.descriptor.servers, servers);
+        assert_eq!(
+            outcome.manifest.descriptor.filename.as_str(),
+            "important.txt"
+        );
         assert_eq!(outcome.manifest.relays, vec!["wss://relay.one".to_string()]);
         assert!(outcome.derived_npub.starts_with("npub1"));
     }
@@ -171,6 +178,7 @@ mod tests {
         let outcome = run_backup(
             &derived(),
             Cursor::new(b"data".to_vec()),
+            Filename::parse("data.bin").unwrap(),
             &["https://blossom.down".into(), "https://blossom.up".into()],
             2,
             3,
@@ -197,6 +205,7 @@ mod tests {
         let result = run_backup(
             &derived(),
             Cursor::new(b"data".to_vec()),
+            Filename::parse("data.bin").unwrap(),
             &["https://blossom.down".into()],
             2,
             3,

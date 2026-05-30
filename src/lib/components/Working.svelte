@@ -35,18 +35,16 @@
       if (mode === "seal") {
         app.outcome = await backup(app.nsec, app.masterPassword, app.filePath);
       } else if (app.recoverMode === "shares") {
-        await recoverWithShares(
+        app.recoveredTo = await recoverWithShares(
           app.shareEntries.map((s) => s.trim()).filter(Boolean),
-          app.outputPath,
+          app.outputDir,
         );
-        app.recoveredTo = app.outputPath;
       } else {
-        await recoverWithPassword(
+        app.recoveredTo = await recoverWithPassword(
           app.recoverNsec,
           app.recoverPassword,
-          app.outputPath,
+          app.outputDir,
         );
-        app.recoveredTo = app.outputPath;
       }
       runDone = true;
       finish();

@@ -13,62 +13,74 @@ use crate::crypto::kdf::{self, KdfParams};
 use crate::crypto::slip39;
 use crate::error::{Error, Result};
 use crate::manifest::Manifest;
-use crate::metadata::{self, BackupDescriptor};
+use crate::metadata::{self, BackupDescriptor, Filename};
 use crate::relay::MetadataStore;
 use crate::secret::{DerivedKey, MasterKey, Password};
 
 /// Recover using the master key and password.
-pub async fn recover_with_password<F, M>(
+///
+/// `open_output` is handed the original file name and returns the sink to write
+/// the recovered plaintext to, so the caller decides the destination *from* the
+/// name the backup recorded. The recovered name is returned on success.
+pub async fn recover_with_password<F, M, W>(
     master_nsec: &str,
     password: &str,
     kdf_params: &KdfParams,
     manifest: Option<&Manifest>,
     blob_factory: &F,
     metadata_store: &M,
-    output: impl Write,
-) -> Result<()>
+    open_output: impl FnOnce(&Filename) -> Result<W>,
+) -> Result<Filename>
 where
     F: BlobStoreFactory,
     M: MetadataStore,
+    W: Write,
 {
     let master = MasterKey::parse(master_nsec)?;
     let derived = kdf::derive(&master, &Password::new(password.to_string()), kdf_params)?;
-    recover(&derived, manifest, blob_factory, metadata_store, output).await
+    recover(&derived, manifest, blob_factory, metadata_store, open_output).await
 }
 
 /// Recover using a quorum of Shamir shares (the master key and password are not
-/// needed).
-pub async fn recover_with_shares<F, M>(
+/// needed). See [`recover_with_password`] for the `open_output` contract.
+pub async fn recover_with_shares<F, M, W>(
     mnemonics: &[String],
     manifest: Option<&Manifest>,
     blob_factory: &F,
     metadata_store: &M,
-    output: impl Write,
-) -> Result<()>
+    open_output: impl FnOnce(&Filename) -> Result<W>,
+) -> Result<Filename>
 where
     F: BlobStoreFactory,
     M: MetadataStore,
+    W: Write,
 {
     let secret = slip39::combine(mnemonics)?;
     let derived = DerivedKey::from_secret_bytes(&secret[..])?;
-    recover(&derived, manifest, blob_factory, metadata_store, output).await
+    recover(&derived, manifest, blob_factory, metadata_store, open_output).await
 }
 
-async fn recover<F, M>(
+async fn recover<F, M, W>(
     derived: &DerivedKey,
     manifest: Option<&Manifest>,
     blob_factory: &F,
     metadata_store: &M,
-    output: impl Write,
-) -> Result<()>
+    open_output: impl FnOnce(&Filename) -> Result<W>,
+) -> Result<Filename>
 where
     F: BlobStoreFactory,
     M: MetadataStore,
+    W: Write,
 {
     let descriptor = locate(derived, manifest, metadata_store).await?;
     let file_key = kdf::derive_file_key(derived)?;
+
+    // Download and verify the blob *before* opening the destination, so a
+    // missing backup never leaves an empty output file behind.
     let blob = download(&descriptor, blob_factory).await?;
-    cipher::decrypt(&file_key, &blob, output)
+    let output = open_output(&descriptor.filename)?;
+    cipher::decrypt(&file_key, &blob, output)?;
+    Ok(descriptor.filename)
 }
 
 /// Find the backup descriptor: prefer the offline manifest, otherwise fetch the
@@ -137,6 +149,7 @@ mod tests {
     use std::io::Cursor;
 
     const PLAINTEXT: &[u8] = b"the contents worth protecting";
+    const FILENAME: &str = "secret-notes.txt";
 
     fn fast_kdf() -> KdfParams {
         KdfParams {
@@ -166,6 +179,7 @@ mod tests {
         let outcome = run_backup(
             &derived,
             Cursor::new(PLAINTEXT.to_vec()),
+            Filename::parse(FILENAME).unwrap(),
             &["https://blossom.one".into()],
             2,
             3,
@@ -190,19 +204,20 @@ mod tests {
         let f = backed_up().await;
         let mut recovered = Vec::new();
 
-        recover_with_password(
+        let name = recover_with_password(
             &f.nsec,
             &f.password,
             &fast_kdf(),
             None, // no manifest — must find the pointer on the relays
             &f.network,
             &f.relays,
-            &mut recovered,
+            |_| Ok(&mut recovered),
         )
         .await
         .unwrap();
 
         assert_eq!(recovered, PLAINTEXT);
+        assert_eq!(name.as_str(), FILENAME);
     }
 
     #[tokio::test]
@@ -218,7 +233,7 @@ mod tests {
             Some(&f.outcome.manifest),
             &f.network,
             &empty_relays,
-            &mut recovered,
+            |_| Ok(&mut recovered),
         )
         .await
         .unwrap();
@@ -232,11 +247,36 @@ mod tests {
         let quorum = f.outcome.shares[..2].to_vec();
         let mut recovered = Vec::new();
 
-        recover_with_shares(&quorum, None, &f.network, &f.relays, &mut recovered)
+        let name = recover_with_shares(&quorum, None, &f.network, &f.relays, |_| Ok(&mut recovered))
             .await
             .unwrap();
 
         assert_eq!(recovered, PLAINTEXT);
+        assert_eq!(name.as_str(), FILENAME);
+    }
+
+    #[tokio::test]
+    async fn recovery_names_the_sink_from_the_backed_up_filename() {
+        let f = backed_up().await;
+        let mut chosen = None;
+        let mut recovered = Vec::new();
+
+        recover_with_password(
+            &f.nsec,
+            &f.password,
+            &fast_kdf(),
+            None,
+            &f.network,
+            &f.relays,
+            |name| {
+                chosen = Some(name.as_str().to_owned());
+                Ok(&mut recovered)
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(chosen.as_deref(), Some(FILENAME));
     }
 
     #[tokio::test]
@@ -251,7 +291,7 @@ mod tests {
             Some(&f.outcome.manifest), // manifest locates it; the key is still wrong
             &f.network,
             &f.relays,
-            &mut recovered,
+            |_| Ok(&mut recovered),
         )
         .await;
 
@@ -264,7 +304,8 @@ mod tests {
         let one = f.outcome.shares[..1].to_vec();
         let mut recovered = Vec::new();
 
-        let result = recover_with_shares(&one, None, &f.network, &f.relays, &mut recovered).await;
+        let result =
+            recover_with_shares(&one, None, &f.network, &f.relays, |_| Ok(&mut recovered)).await;
 
         assert!(matches!(result, Err(Error::Shamir(_))));
     }

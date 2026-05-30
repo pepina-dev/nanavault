@@ -44,7 +44,7 @@ export const app = $state({
   shareEntries: ["", ""] as string[],
   recoverNsec: "",
   recoverPassword: "",
-  outputPath: "",
+  outputDir: "",
   recoveredTo: "",
 });
 
@@ -66,6 +66,6 @@ export function resetRecover() {
   app.shareEntries = ["", ""];
   app.recoverNsec = "";
   app.recoverPassword = "";
-  app.outputPath = "";
+  app.outputDir = "";
   app.recoveredTo = "";
 }

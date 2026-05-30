@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app, go } from "../store.svelte";
-  import { pickSaveAs } from "../api";
+  import { pickOutputDir } from "../api";
   import Icon from "./Icon.svelte";
   import FlowHeader from "./FlowHeader.svelte";
   import ReassureNote from "./ReassureNote.svelte";
@@ -26,9 +26,9 @@
   async function start() {
     error = "";
     try {
-      const out = await pickSaveAs("recovered-file");
-      if (!out) return; // cancelled the save dialog
-      app.outputPath = out;
+      const dir = await pickOutputDir();
+      if (!dir) return; // cancelled the folder picker
+      app.outputDir = dir;
       go("recovering");
     } catch (e) {
       error = String(e);
