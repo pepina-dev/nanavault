@@ -83,7 +83,13 @@ where
         derived_npub,
         blob_sha256: blob_hash.to_hex(),
         shares,
-        manifest: Manifest::new(descriptor, metadata_store.relays(), blob_size, *kdf_params),
+        manifest: Manifest::new(
+            descriptor,
+            metadata_store.relays(),
+            derived.public_key(),
+            blob_size,
+            *kdf_params,
+        ),
     })
 }
 
