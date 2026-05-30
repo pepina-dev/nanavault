@@ -40,14 +40,20 @@
   <FlowHeader label="Recover a file" onBack={() => go("home")} />
 
   <div class="icon-badge"><Icon name="recover" size={26} /></div>
-  <h2>Bring your file back</h2>
+  <h2>Bring your secret file back</h2>
 
   <!-- mode toggle -->
   <div class="seg" style="margin-top:16px;">
-    <button class="seg-btn {app.recoverMode === 'shares' ? 'on' : ''}" onclick={() => setMode("shares")}>
+    <button
+      class="seg-btn {app.recoverMode === 'shares' ? 'on' : ''}"
+      onclick={() => setMode("shares")}
+    >
       <Icon name="users" size={16} /> With my people's keys
     </button>
-    <button class="seg-btn {app.recoverMode === 'password' ? 'on' : ''}" onclick={() => setMode("password")}>
+    <button
+      class="seg-btn {app.recoverMode === 'password' ? 'on' : ''}"
+      onclick={() => setMode("password")}
+    >
       <Icon name="key" size={16} /> With my key & password
     </button>
   </div>
@@ -68,10 +74,16 @@
     <div class="stack" style="gap: 14px; margin-top: 20px;">
       {#each app.shareEntries as _entry, i}
         <div>
-          <label for={`share-${i}`} style="display:flex; align-items:center; gap:8px;">
+          <label
+            for={`share-${i}`}
+            style="display:flex; align-items:center; gap:8px;"
+          >
             Friend {i + 1}'s recovery key
             {#if app.shareEntries[i].trim().length > 0}
-              <span class="pill pill-success" style="display:inline-flex;align-items:center;gap:4px;">
+              <span
+                class="pill pill-success"
+                style="display:inline-flex;align-items:center;gap:4px;"
+              >
                 <Icon name="check" size={12} stroke={2.6} /> got it
               </span>
             {/if}
@@ -92,15 +104,32 @@
       Enter the same <strong>secret key</strong> and <strong>password</strong> you
       sealed the file with, and I'll bring it back on my own.
     </p>
-    <div style="margin-top: 18px; display:flex; flex-direction:column; gap:4px;">
-      <SecretField id="r-nsec" label="Your secret key" placeholder="nsec1…" bind:value={app.recoverNsec} />
-      <SecretField id="r-pw" label="Your password" placeholder="Something only you know" bind:value={app.recoverPassword} />
+    <div
+      style="margin-top: 18px; display:flex; flex-direction:column; gap:4px;"
+    >
+      <SecretField
+        id="r-nsec"
+        label="Your secret key"
+        placeholder="nsec1…"
+        bind:value={app.recoverNsec}
+      />
+      <SecretField
+        id="r-pw"
+        label="Your password"
+        placeholder="Something only you know"
+        bind:value={app.recoverPassword}
+      />
     </div>
   {/if}
 
   {#if error}<div class="error">{error}</div>{/if}
 
-  <button class="btn" style="margin-top: 16px;" disabled={!canRecover} onclick={start}>
+  <button
+    class="btn"
+    style="margin-top: 16px;"
+    disabled={!canRecover}
+    onclick={start}
+  >
     <Icon name="sparkles" /> Bring my file back
   </button>
 </div>

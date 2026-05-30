@@ -37,7 +37,12 @@
 </script>
 
 <div class="card">
-  <FlowHeader label="Keep something safe" total={4} current={3} onBack={() => go("password")} />
+  <FlowHeader
+    label="Keep something safe"
+    total={4}
+    current={3}
+    onBack={() => go("password")}
+  />
 
   {#if shares.length < 3}
     <div class="icon-badge"><Icon name="users" size={26} /></div>
@@ -49,9 +54,9 @@
   {:else}
     <h2>Hand out the keys</h2>
     <p class="lead">
-      Each person gets one <strong>recovery key</strong> — a list of words. Read it
-      out or copy it across however you trust most. Any <strong>2 of 3</strong> can
-      bring your file back — one alone can't.
+      Each person gets one <strong>recovery key</strong> — a list of words. Read
+      it out or copy it across however you trust most. Any
+      <strong>2 of 3</strong> can bring your secret file back — one alone can't.
     </p>
 
     <div class="stack" style="gap: 11px; margin-top: 22px;">
@@ -60,17 +65,29 @@
           <button class="keycard-head" type="button" onclick={() => toggle(i)}>
             <Avatar name={g.hint || "?"} seed={i} size={44} />
             <div style="flex:1; min-width:0; text-align:left;">
-              <div style="font-weight:700;">{g.hint.trim() || `Person ${i + 1}`}</div>
-              <div class="muted" style="font-size:0.82rem;">Recovery key {i + 1} of 3</div>
+              <div style="font-weight:700;">
+                {g.hint.trim() || `Person ${i + 1}`}
+              </div>
+              <div class="muted" style="font-size:0.82rem;">
+                Recovery key {i + 1} of 3
+              </div>
             </div>
             {#if g.shared}
-              <span class="pill pill-success" style="display:inline-flex;align-items:center;gap:4px;">
+              <span
+                class="pill pill-success"
+                style="display:inline-flex;align-items:center;gap:4px;"
+              >
                 <Icon name="check" size={13} stroke={2.5} /> given
               </span>
             {:else}
               <span class="pill">not yet</span>
             {/if}
-            <span class="ns-ic" style="color:var(--fg-hint); transform:rotate({open === i ? -90 : 90}deg); transition:transform .2s;">
+            <span
+              class="ns-ic"
+              style="color:var(--fg-hint); transform:rotate({open === i
+                ? -90
+                : 90}deg); transition:transform .2s;"
+            >
               <Icon name="arrow-right" size={18} />
             </span>
           </button>
@@ -86,21 +103,32 @@
               />
 
               <div class="note" style="margin-top:14px; padding:14px 16px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <div
+                  style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;"
+                >
                   <span class="eyebrow">Recovery key</span>
                 </div>
                 {#if revealed[i]}
                   <div class="mnemonic">{shares[i]}</div>
                 {:else}
-                  <button class="words-hidden" onclick={() => (revealed[i] = true)}>
+                  <button
+                    class="words-hidden"
+                    onclick={() => (revealed[i] = true)}
+                  >
                     <Icon name="eye" size={18} /> Tap to show the recovery key
                   </button>
                 {/if}
               </div>
 
-              <p class="muted" style="display:flex; gap:7px; align-items:flex-start; margin:12px 0 14px;">
-                <span style="display:inline-flex; margin-top:2px;"><Icon name="shield" size={14} /></span>
-                One key alone opens nothing — it takes any 2 together. Safe to give to {g.hint.trim().split(" ")[0] || "them"}.
+              <p
+                class="muted"
+                style="display:flex; gap:7px; align-items:flex-start; margin:12px 0 14px;"
+              >
+                <span style="display:inline-flex; margin-top:2px;"
+                  ><Icon name="shield" size={14} /></span
+                >
+                One key alone opens nothing — it takes any 2 together. Safe to give
+                to {g.hint.trim().split(" ")[0] || "them"}.
               </p>
 
               <button class="btn btn-dark" onclick={() => copyShare(i)}>
@@ -109,7 +137,11 @@
               </button>
 
               {#if !g.shared}
-                <button class="btn" style="margin-top:12px;" onclick={() => give(i)}>
+                <button
+                  class="btn"
+                  style="margin-top:12px;"
+                  onclick={() => give(i)}
+                >
                   <Icon name="check" /> Mark as given
                 </button>
               {/if}
@@ -121,15 +153,31 @@
 
     <div class="note-sunken" style="align-items:center; margin-top:18px;">
       <div style="flex:1;">
-        <div style="font-weight:700; color:var(--fg); margin-bottom:6px;">{handedOut} of 3 keys handed out</div>
-        <div style="height:6px; border-radius:999px; background:var(--border); overflow:hidden;">
-          <div style="height:100%; width:{(handedOut / 3) * 100}%; background:{allShared ? 'var(--success)' : 'var(--rose)'}; border-radius:999px; transition:width .4s ease;"></div>
+        <div style="font-weight:700; color:var(--fg); margin-bottom:6px;">
+          {handedOut} of 3 keys handed out
+        </div>
+        <div
+          style="height:6px; border-radius:999px; background:var(--border); overflow:hidden;"
+        >
+          <div
+            style="height:100%; width:{(handedOut / 3) *
+              100}%; background:{allShared
+              ? 'var(--success)'
+              : 'var(--rose)'}; border-radius:999px; transition:width .4s ease;"
+          ></div>
         </div>
       </div>
-      {#if allShared}<span class="ns-ic" style="color:var(--success);"><Icon name="check" size={20} /></span>{/if}
+      {#if allShared}<span class="ns-ic" style="color:var(--success);"
+          ><Icon name="check" size={20} /></span
+        >{/if}
     </div>
 
-    <button class="btn" style="margin-top: 18px;" disabled={!allShared} onclick={() => go("protect-success")}>
+    <button
+      class="btn"
+      style="margin-top: 18px;"
+      disabled={!allShared}
+      onclick={() => go("protect-success")}
+    >
       <Icon name="check" /> All done
     </button>
   {/if}
@@ -180,5 +228,8 @@
     font-size: 0.9rem;
     cursor: pointer;
   }
-  .words-hidden:hover { color: var(--rose); border-color: var(--rose); }
+  .words-hidden:hover {
+    color: var(--rose);
+    border-color: var(--rose);
+  }
 </style>

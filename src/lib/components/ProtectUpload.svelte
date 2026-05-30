@@ -35,25 +35,32 @@
 </script>
 
 <div class="card">
-  <FlowHeader label="Keep something safe" total={4} current={0} onBack={() => go("home")} />
+  <FlowHeader
+    label="Keep something safe"
+    total={4}
+    current={0}
+    onBack={() => go("home")}
+  />
 
-  <h2>What should we keep safe?</h2>
+  <h2>What secret file should we keep safe?</h2>
   <p class="lead">
-    Pick one file that matters — a wallet backup, a password export, a will, the
-    photos you can't lose.
+    Pick one file that matters to you: your family recipes, a secret, or any
+    important information you can't lose.
   </p>
 
   <div style="margin-top: 22px;">
     {#if app.fileName}
       <div style="display:flex; align-items:center; gap:12px;">
         <FileChip name={app.fileName} />
-        <button class="flow-back" aria-label="Remove file" onclick={clear} style="margin-left:auto;">
+        <button
+          class="flow-back"
+          aria-label="Remove file"
+          onclick={clear}
+          style="margin-left:auto;"
+        >
           <Icon name="x" size={19} />
         </button>
       </div>
-      <p class="muted" style="display:flex; gap:7px; align-items:center; margin-top:12px;">
-        <Icon name="lock" size={14} /> Stays on your computer until it's sealed.
-      </p>
     {:else}
       <div
         class="dropzone"
@@ -71,7 +78,12 @@
 
   {#if error}<div class="error">{error}</div>{/if}
 
-  <button class="btn" style="margin-top: 30px;" disabled={!canContinue} onclick={() => go("nsec")}>
+  <button
+    class="btn"
+    style="margin-top: 30px;"
+    disabled={!canContinue}
+    onclick={() => go("nsec")}
+  >
     Continue <Icon name="arrow-right" />
   </button>
 </div>

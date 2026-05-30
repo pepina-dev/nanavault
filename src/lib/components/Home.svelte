@@ -17,20 +17,16 @@
   <div class="brand"><NanaLogo size={92} /></div>
   <h1>NanaVault</h1>
   <p class="lead">
-    Hello, dear! I keep your important secrets safe — and I help you get them back
+    Hello, dear! I keep your important secrets safe and I help you get them back
     if they ever go missing.
   </p>
 
   <div class="stack" style="margin-top: 26px;">
     <button class="btn" onclick={startProtect}>
-      <Icon name="lock" /> Protect a secret
+      <Icon name="lock" /> Protect secret file
     </button>
     <button class="btn btn-ghost" onclick={startRecover}>
-      <Icon name="recover" /> Recover a lost secret
+      <Icon name="recover" /> Recover secret file
     </button>
   </div>
-
-  <p class="muted" style="margin-top: 24px;">
-    Nothing ever leaves your computer. Promise.
-  </p>
 </div>
