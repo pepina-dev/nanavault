@@ -96,8 +96,7 @@
   {:else}
     <p class="lead" style="margin-top:18px;">
       Enter the <strong>backup code</strong> you saved (or your own nsec), plus
-      its <strong>password</strong> if you set one, and I'll bring the file back
-      on my own.
+      its <strong>password</strong> and I'll bring the file back on my own.
     </p>
     <div
       style="margin-top: 18px; display:flex; flex-direction:column; gap:14px;"
@@ -115,8 +114,8 @@
       </div>
       <SecretField
         id="r-pw"
-        label="Your password (if you set one)"
-        placeholder="Leave blank if you didn't set one"
+        label="Your password"
+        placeholder="Enter your password here"
         bind:value={app.recoverPassword}
       />
     </div>
