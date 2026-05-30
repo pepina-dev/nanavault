@@ -9,10 +9,9 @@
 
 use nostr::nips::nip44;
 use nostr::{Event, EventBuilder, Kind};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::crypto::cipher::{BlobHash, CipherId};
-use crate::crypto::kdf::KdfParams;
+use crate::crypto::cipher::BlobHash;
 use crate::error::{Error, Result};
 use crate::secret::DerivedKey;
 
@@ -23,40 +22,107 @@ pub const BACKUP_EVENT_KIND: u16 = 10909;
 /// The current pointer/manifest payload version.
 pub const DESCRIPTOR_VERSION: u8 = 1;
 
-/// Everything needed to locate and interpret a backup, minus the key.
+/// The original name of a backed-up file: a single path component that is safe
+/// to use, on its own, as a recovery destination name.
 ///
-/// This is the payload of the pointer event; the recovery manifest is this plus
-/// the relay list. It deliberately holds no secret material.
+/// Construction is the only way to obtain one, and it rejects empty names, path
+/// separators, `.`/`..`, control characters, and over-long names. A `Filename`
+/// in hand therefore *cannot* escape the directory it is later joined into — the
+/// path-traversal defense lives in the type, not at every call site. The bound
+/// is enforced again on deserialization, so a hostile pointer or manifest is
+/// refused as it is read, never as it is used.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Filename(String);
+
+/// The longest name we accept, in bytes. Comfortably under the 255-byte limit
+/// that common filesystems impose on a single component.
+const MAX_FILENAME_LEN: usize = 255;
+
+impl Filename {
+    /// Validate `value` as a standalone file name.
+    pub fn parse(value: &str) -> Result<Self> {
+        let reject = |reason: &str| {
+            Err(Error::InvalidFilename(format!("{value:?}: {reason}")))
+        };
+
+        if value.is_empty() {
+            return reject("must not be empty");
+        }
+        if value.len() > MAX_FILENAME_LEN {
+            return reject("is too long");
+        }
+        if value == "." || value == ".." {
+            return reject("refers to a directory");
+        }
+        if value.contains('/') || value.contains('\\') {
+            return reject("must not contain a path separator");
+        }
+        if value.chars().any(char::is_control) {
+            return reject("must not contain control characters");
+        }
+
+        Ok(Self(value.to_owned()))
+    }
+
+    /// Take the final component of a filesystem path and validate it as a name.
+    /// This is how a backup records the name of the file the user chose.
+    pub fn from_path(path: &str) -> Result<Self> {
+        let name = std::path::Path::new(path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| {
+                Error::InvalidFilename(format!("{path:?}: has no file-name component"))
+            })?;
+        Self::parse(name)
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Serialize for Filename {
+    fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for Filename {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let value = String::deserialize(deserializer)?;
+        Self::parse(&value).map_err(serde::de::Error::custom)
+    }
+}
+
+/// Everything recovery needs from the pointer: *where* the blob lives, *which*
+/// blob it is, and *what to call it* once restored.
+///
+/// This is the payload of the encrypted pointer event. It carries only what the
+/// recovery path actually consumes — nothing self-descriptive (the cipher) or
+/// merely informational (the blob size), and nothing that recovery cannot use
+/// (the KDF parameters, which the password path must already know before it can
+/// reach this payload at all). Those live in the [`Manifest`](crate::manifest)
+/// instead. It holds no secret material; the file name is sensitive, but the
+/// payload is encrypted, so it never reaches a relay in the clear.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BackupDescriptor {
     /// Payload format version.
     pub v: u8,
-    /// SHA-256 of the encrypted blob — its Blossom address.
+    /// SHA-256 of the encrypted blob — its Blossom address and integrity tag.
     pub blob_sha256: BlobHash,
-    /// Size of the encrypted blob, in bytes.
-    pub blob_size: u64,
     /// Blossom servers the blob was uploaded to.
     pub servers: Vec<String>,
-    /// The AEAD used for the blob.
-    pub cipher: CipherId,
-    /// The Argon2id parameters used to derive the key.
-    pub kdf: KdfParams,
+    /// The original name of the backed-up file, restored on recovery.
+    pub filename: Filename,
 }
 
 impl BackupDescriptor {
-    pub fn new(
-        blob_sha256: BlobHash,
-        blob_size: u64,
-        servers: Vec<String>,
-        kdf: KdfParams,
-    ) -> Self {
+    pub fn new(blob_sha256: BlobHash, servers: Vec<String>, filename: Filename) -> Self {
         Self {
             v: DESCRIPTOR_VERSION,
             blob_sha256,
-            blob_size,
             servers,
-            cipher: crate::crypto::cipher::CIPHER,
-            kdf,
+            filename,
         }
     }
 }
@@ -106,7 +172,6 @@ pub fn parse_pointer(event: &Event, derived: &DerivedKey) -> Result<BackupDescri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crypto::kdf::KdfParams;
     use nostr::Keys;
 
     fn derived_key() -> DerivedKey {
@@ -116,10 +181,73 @@ mod tests {
     fn descriptor() -> BackupDescriptor {
         BackupDescriptor::new(
             BlobHash::of(b"some encrypted blob"),
-            4096,
             vec!["https://blossom.example".into()],
-            KdfParams::default(),
+            Filename::parse("my-secret-file.txt").unwrap(),
         )
+    }
+
+    #[test]
+    fn a_plain_filename_round_trips() {
+        let name = Filename::parse("report.pdf").unwrap();
+        assert_eq!(name.as_str(), "report.pdf");
+    }
+
+    #[test]
+    fn a_filename_that_could_escape_its_directory_is_rejected() {
+        for hostile in [
+            "",
+            ".",
+            "..",
+            "a/b.txt",
+            "../secret",
+            "/etc/passwd",
+            "back\\slash.txt",
+            "with\0null",
+            "with\nnewline",
+        ] {
+            assert!(
+                matches!(Filename::parse(hostile), Err(Error::InvalidFilename(_))),
+                "expected {hostile:?} to be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn an_over_long_filename_is_rejected() {
+        let long = "a".repeat(256);
+        assert!(matches!(
+            Filename::parse(&long),
+            Err(Error::InvalidFilename(_))
+        ));
+    }
+
+    #[test]
+    fn from_path_keeps_only_the_final_component() {
+        assert_eq!(
+            Filename::from_path("/home/alice/taxes/2025.pdf")
+                .unwrap()
+                .as_str(),
+            "2025.pdf"
+        );
+    }
+
+    #[test]
+    fn from_path_rejects_a_path_with_no_file_name() {
+        assert!(matches!(
+            Filename::from_path("/"),
+            Err(Error::InvalidFilename(_))
+        ));
+    }
+
+    #[test]
+    fn a_filename_serializes_as_a_bare_string() {
+        let json = serde_json::to_string(&Filename::parse("a.txt").unwrap()).unwrap();
+        assert_eq!(json, r#""a.txt""#);
+    }
+
+    #[test]
+    fn deserializing_a_hostile_filename_is_refused() {
+        assert!(serde_json::from_str::<Filename>(r#""../escape""#).is_err());
     }
 
     #[test]
@@ -150,9 +278,11 @@ mod tests {
         let descriptor = descriptor();
         let event = build_pointer(&descriptor, &key).unwrap();
 
-        // The blob hash and the server URL must not appear in the clear.
+        // The blob hash, the server URL, and the file name must not appear in
+        // the clear: a relay observer learns nothing about the backup.
         assert!(!event.content.contains(&descriptor.blob_sha256.to_hex()));
         assert!(!event.content.contains("blossom.example"));
+        assert!(!event.content.contains("my-secret-file.txt"));
     }
 
     #[test]
