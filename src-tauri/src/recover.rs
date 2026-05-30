@@ -38,7 +38,7 @@ where
     F: BlobStoreFactory,
     M: MetadataStore,
 {
-    let master = MasterKey::parse(master_nsec)?;
+    let master = MasterKey::from_key_or_backup_code(master_nsec)?;
     let derived = kdf::derive(&master, &Password::new(password.to_string()), kdf_params)?;
     recover(&derived, manifest, blob_factory, metadata_store, output_dir).await
 }
@@ -86,17 +86,17 @@ where
 /// defensive bound, not a limit anyone should hit.
 const MAX_DISAMBIGUATION_ATTEMPTS: u32 = 1000;
 
-/// Write a file into `dir` under `name`, atomically: the plaintext is streamed to
-/// a temporary file in the same directory and promoted by an atomic rename only
-/// once `write` has fully succeeded. Any earlier failure — a wrong key, an I/O
-/// error, a crash — discards the temporary file (it is removed on drop) and
+/// Write a file into `dir` under `name`, atomically: the content `write` produces
+/// is streamed to a temporary file in the same directory and promoted by an atomic
+/// rename only once `write` has fully succeeded. Any earlier failure — a wrong key,
+/// an I/O error, a crash — discards the temporary file (it is removed on drop) and
 /// leaves the destination untouched.
 ///
 /// An existing file is never overwritten: if the name is taken, the next free
 /// `stem (N).ext` is used instead. The already-written temporary file is reused
 /// across attempts, so only the rename is retried, and `persist_noclobber` keeps
 /// each attempt race-free.
-fn write_atomically(
+pub(crate) fn write_atomically(
     dir: &Path,
     name: &Filename,
     write: impl FnOnce(&File) -> Result<()>,

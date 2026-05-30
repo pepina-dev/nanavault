@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { app, go } from "../store.svelte";
-  import { pickOutputDir } from "../api";
+  import { app, go, type RecoverMode } from "../store.svelte";
+  import { THRESHOLD, SHARE_COUNT } from "../api";
   import Icon from "./Icon.svelte";
   import FlowHeader from "./FlowHeader.svelte";
   import ReassureNote from "./ReassureNote.svelte";
@@ -8,31 +8,25 @@
 
   let error = $state("");
 
-  function setMode(m: "shares" | "password") {
+  function setMode(m: RecoverMode) {
     app.recoverMode = m;
     error = "";
   }
 
   const sharesReady = $derived(
-    app.shareEntries.filter((s) => s.trim().length > 0).length >= 2,
+    app.shareEntries.filter((s) => s.trim().length > 0).length >= THRESHOLD,
   );
-  const passwordReady = $derived(
-    app.recoverNsec.trim().length > 3 && app.recoverPassword.length > 0,
-  );
+  // Easy-mode codes may have no password, so only the code/key is required.
+  const passwordReady = $derived(app.recoverNsec.trim().length > 3);
   const canRecover = $derived(
     app.recoverMode === "shares" ? sharesReady : passwordReady,
   );
 
-  async function start() {
+  function start() {
     error = "";
-    try {
-      const dir = await pickOutputDir();
-      if (!dir) return; // cancelled the folder picker
-      app.outputDir = dir;
-      go("recovering");
-    } catch (e) {
-      error = String(e);
-    }
+    // We recover first and ask where to keep the file afterwards, so there's no
+    // folder picker before the file even exists.
+    go("recovering");
   }
 </script>
 
@@ -54,20 +48,20 @@
       class="seg-btn {app.recoverMode === 'password' ? 'on' : ''}"
       onclick={() => setMode("password")}
     >
-      <Icon name="key" size={16} /> With my key & password
+      <Icon name="key" size={16} /> With my backup code
     </button>
   </div>
 
   {#if app.recoverMode === "shares"}
     <p class="lead" style="margin-top:18px;">
-      Ask <strong>2 of your 3 people</strong> for their recovery keys and paste them
-      in below. You don't need everyone — just any two.
+      Ask <strong>{THRESHOLD} of your {SHARE_COUNT} people</strong> for their
+      recovery codes and paste them in below. You don't need everyone — just any {THRESHOLD}.
     </p>
 
     <div style="margin-top:16px;">
       <ReassureNote icon="heart" color="var(--rose)">
-        One person's key can't open anything. It takes <b>any 2</b> together to bring
-        your file back.
+        One person's key can't open anything. It takes <b>any {THRESHOLD}</b> together
+        to bring your file back.
       </ReassureNote>
     </div>
 
@@ -78,7 +72,7 @@
             for={`share-${i}`}
             style="display:flex; align-items:center; gap:8px;"
           >
-            Friend {i + 1}'s recovery key
+            Friend {i + 1}'s recovery code
             {#if app.shareEntries[i].trim().length > 0}
               <span
                 class="pill pill-success"
@@ -92,7 +86,7 @@
             id={`share-${i}`}
             class="input"
             rows="2"
-            placeholder="Paste their recovery key (a list of words)…"
+            placeholder="Paste their recovery code (a list of words)…"
             style="resize:none; line-height:1.5; font-family:ui-monospace,monospace; font-size:0.95rem;"
             bind:value={app.shareEntries[i]}
           ></textarea>
@@ -101,22 +95,28 @@
     </div>
   {:else}
     <p class="lead" style="margin-top:18px;">
-      Enter the same <strong>secret key</strong> and <strong>password</strong> you
-      sealed the file with, and I'll bring it back on my own.
+      Enter the <strong>backup code</strong> you saved (or your own nsec), plus
+      its <strong>password</strong> if you set one, and I'll bring the file back
+      on my own.
     </p>
     <div
-      style="margin-top: 18px; display:flex; flex-direction:column; gap:4px;"
+      style="margin-top: 18px; display:flex; flex-direction:column; gap:14px;"
     >
-      <SecretField
-        id="r-nsec"
-        label="Your secret key"
-        placeholder="nsec1…"
-        bind:value={app.recoverNsec}
-      />
+      <div>
+        <label for="r-nsec">Your backup code or secret key</label>
+        <textarea
+          id="r-nsec"
+          class="input"
+          rows="2"
+          placeholder="Paste your backup code (a list of words), or your nsec…"
+          style="resize:none; line-height:1.5; font-family:ui-monospace,monospace; font-size:0.95rem;"
+          bind:value={app.recoverNsec}
+        ></textarea>
+      </div>
       <SecretField
         id="r-pw"
-        label="Your password"
-        placeholder="Something only you know"
+        label="Your password (if you set one)"
+        placeholder="Leave blank if you didn't set one"
         bind:value={app.recoverPassword}
       />
     </div>

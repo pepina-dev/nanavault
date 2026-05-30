@@ -9,13 +9,15 @@
 </script>
 
 <div class="card">
-  <FlowHeader label="Keep something safe" total={4} current={1} onBack={() => go("protect")} />
+  <FlowHeader
+    label="Keep something safe"
+    total={5}
+    current={2}
+    onBack={() => go("mode")}
+  />
 
   <h2>Add your secret key</h2>
-  <p class="lead">
-    Your nostr private key helps seal this file. Paste it once — it's used here and
-    kept safe right alongside your file.
-  </p>
+  <p class="lead">Your nostr private key is used to encrypt this file.</p>
 
   <div style="margin-top: 20px;">
     <SecretField
@@ -29,12 +31,17 @@
 
   <div style="margin-top: 20px;">
     <ReassureNote icon="shield">
-      This never leaves this app, dear. The key we make can only ever open
-      <b>this one file</b> — never your whole identity.
+      This key is only used to protect <b>this one file</b>
+      and then it is erased.
     </ReassureNote>
   </div>
 
-  <button class="btn" style="margin-top: 28px;" disabled={!canContinue} onclick={() => go("password")}>
+  <button
+    class="btn"
+    style="margin-top: 28px;"
+    disabled={!canContinue}
+    onclick={() => go("password")}
+  >
     Continue <Icon name="arrow-right" />
   </button>
 </div>

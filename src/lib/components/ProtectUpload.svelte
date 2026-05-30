@@ -11,7 +11,7 @@
     error = "";
     try {
       const path = await pickFile();
-      if (!path) return; // grandma cancelled the dialog
+      if (!path) return;
       app.filePath = path;
       app.fileName = baseName(path);
     } catch (e) {
@@ -32,20 +32,22 @@
   }
 
   const canContinue = $derived(app.filePath.length > 0);
+  // Advanced collects key + password (5 steps); easy shows one code screen (4).
+  const total = 5;
 </script>
 
 <div class="card">
   <FlowHeader
     label="Keep something safe"
-    total={4}
+    {total}
     current={0}
     onBack={() => go("home")}
   />
 
-  <h2>What secret file should we keep safe?</h2>
+  <h2>What do you want to keep safe?</h2>
   <p class="lead">
-    Pick one file that matters to you: your family recipes, a secret, or any
-    important information you can't lose.
+    Pick one file that matters to you: your family recipes, a will, or any
+    important information you don't want to lose.
   </p>
 
   <div style="margin-top: 22px;">
@@ -82,7 +84,7 @@
     class="btn"
     style="margin-top: 30px;"
     disabled={!canContinue}
-    onclick={() => go("nsec")}
+    onclick={() => go("mode")}
   >
     Continue <Icon name="arrow-right" />
   </button>

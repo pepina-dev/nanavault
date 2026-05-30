@@ -1,21 +1,44 @@
 <script lang="ts">
   import { app, go, resetRecover } from "../store.svelte";
-  import { baseName } from "../api";
+  import { baseName, pickOutputDir, saveRecovered } from "../api";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import Icon from "./Icon.svelte";
-  import NanaLogo from "./NanaLogo.svelte";
   import FileChip from "./FileChip.svelte";
+  import SealMark from "./SealMark.svelte";
 
   let error = $state("");
+  let savedPath = $state(""); // the permanent home, once the user picks one
+  let busy = $state(false);
 
-  const savedPath = app.recoveredTo;
+  // Recovery dropped the file in a temp spot; we still show its real name.
+  const tempPath = $derived(app.recoveredTo);
+  const fileName = $derived(baseName(savedPath || tempPath));
+  const broughtBack = $derived(
+    app.recoverMode === "password" ? "decrypted" : "recovered",
+  );
+
+  async function chooseAndSave() {
+    error = "";
+    busy = true;
+    try {
+      const dir = await pickOutputDir();
+      if (!dir) return; // cancelled — leave it in temp, let them try again
+      savedPath = await saveRecovered(tempPath, dir);
+    } catch (e) {
+      console.error(e);
+      error = `I couldn't save it there, dear. (${String(e)})`;
+    } finally {
+      busy = false;
+    }
+  }
 
   async function reveal() {
     error = "";
     try {
       await revealItemInDir(savedPath);
     } catch (e) {
-      error = String(e);
+      console.error(e);
+      error = `I couldn't open the folder, dear. (${String(e)})`;
     }
   }
 
@@ -27,32 +50,48 @@
 
 <div class="card">
   <div class="center">
-    <div class="seal-mark pop" style="margin-bottom:14px;">
-      <NanaLogo size={88} />
-      <span
-        style="position:absolute; right:0; bottom:0; width:30px; height:30px; border-radius:50%; background:var(--success); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 3px var(--bg);"
+    <SealMark size={88} check />
+    {#if savedPath}
+      <span class="badge-success"
+        ><Icon name="check" size={13} stroke={2.6} /> Saved to your computer</span
       >
-        <Icon name="check" size={17} stroke={2.6} />
-      </span>
-    </div>
-    <h1>Got it back!</h1>
-    <p class="lead">Your file is unsealed and saved to your computer.</p>
+      <h1 style="margin-top:14px;">All set — it's saved!</h1>
+      <p class="lead">Your {broughtBack} file is saved and ready to open.</p>
+    {:else}
+      <h1>Got it back!</h1>
+      <p class="lead">Your file is {broughtBack} and ready.</p>
+    {/if}
     <div style="display:flex; justify-content:center; margin:18px 0;">
-      <FileChip name={baseName(savedPath)} />
+      <FileChip name={fileName} />
     </div>
   </div>
 
-  <div class="flabel">Saved to</div>
-  <div class="note" style="word-break:break-all; display:flex; align-items:center; gap:8px;">
-    <span class="inline-ic"><Icon name="download" size={18} /></span> {savedPath}
-  </div>
+  {#if !savedPath}
+    <p class="lead" style="text-align:center;">
+      Where would you like to keep it?
+    </p>
 
-  {#if error}<div class="error">{error}</div>{/if}
+    {#if error}<div class="error">{error}</div>{/if}
 
-  <div class="stack" style="margin-top: 26px;">
-    <button class="btn" onclick={reveal}>
-      <Icon name="search" /> Show me where it is
-    </button>
-    <button class="btn btn-ghost" onclick={home}><Icon name="home" /> Back to home</button>
-  </div>
+    <div class="stack" style="margin-top: 22px;">
+      <button class="btn" disabled={busy} onclick={chooseAndSave}>
+        <Icon name="download" />
+        {busy ? "Saving…" : "Choose a folder & save"}
+      </button>
+      <button class="btn btn-ghost" onclick={home}>
+        <Icon name="home" /> Back to home
+      </button>
+    </div>
+  {:else}
+    {#if error}<div class="error">{error}</div>{/if}
+
+    <div class="stack" style="margin-top: 26px;">
+      <button class="btn btn-success" onclick={reveal}>
+        <Icon name="search" /> Show me where it is
+      </button>
+      <button class="btn btn-ghost" onclick={home}>
+        <Icon name="home" /> Back to home
+      </button>
+    </div>
+  {/if}
 </div>

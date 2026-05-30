@@ -1,12 +1,12 @@
 <script lang="ts">
-  import Icon from "./Icon.svelte";
+  import Icon, { type IconName } from "./Icon.svelte";
   import type { Snippet } from "svelte";
 
   let {
     icon = "shield",
     color = "var(--success)",
     children,
-  }: { icon?: string; color?: string; children: Snippet } = $props();
+  }: { icon?: IconName; color?: string; children: Snippet } = $props();
 </script>
 
 <div class="note-sunken">
