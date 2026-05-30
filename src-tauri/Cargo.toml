@@ -2,7 +2,7 @@
 name = "nanavault"
 version = "0.1.0"
 description = "The NanaVault desktop application"
-authors = ["Javier G. Montoya S <claudecode@jgmontoya.com>"]
+authors = ["Javier <nanavault@jgmontoya.com>", "Pepi"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -22,4 +22,21 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+nostr = { version = "0.44", features = ["nip44"] }
+nostr-sdk = "0.44"
+nostr-blossom = "0.44"
+argon2 = "0.5"
+hkdf = "0.12"
+sha2 = "0.10"
+hmac = "0.12"
+pbkdf2 = "0.12"
+chacha20poly1305 = { version = "0.10", features = ["stream"] }
+getrandom = "0.2"
+thiserror = "2"
+hex = "0.4"
+async-trait = "0.1"
+zeroize = "1"
+url = "2"
 
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
