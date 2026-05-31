@@ -6,7 +6,12 @@
     clearProtectSecrets,
     clearRecoverSecrets,
   } from "../store.svelte";
-  import { backup, recoverWithShares, recoverWithPassword } from "../api";
+  import {
+    backup,
+    backupText,
+    recoverWithShares,
+    recoverWithPassword,
+  } from "../api";
   import Icon, { type IconName } from "./Icon.svelte";
   import NanaLogo from "./NanaLogo.svelte";
 
@@ -19,6 +24,7 @@
   //   recover: shares → "Recovering", key+password → "Decrypting"
   const easyProtect = $derived(app.recoveryMode === "easy");
   const sealVerb = $derived(easyProtect ? "Protecting" : "Encrypting");
+  const sealNoun = $derived(app.protectInput === "text" ? "secret" : "file");
   const decrypting = $derived(app.recoverMode === "password");
   const recoverVerb = $derived(decrypting ? "Decrypting" : "Recovering");
 
@@ -32,7 +38,7 @@
     },
     {
       icon: "lock",
-      label: `${sealVerb} your file`,
+      label: `${sealVerb} your ${sealNoun}`,
       sub: "Locking it so only your key opens it",
     },
     {
@@ -62,7 +68,7 @@
   const tasks = $derived(mode === "seal" ? SEAL : RECOVER);
   const title = $derived(
     mode === "seal"
-      ? `${sealVerb} your file…`
+      ? `${sealVerb} your ${sealNoun}…`
       : `${recoverVerb} your file…`,
   );
 
@@ -93,27 +99,31 @@
   async function runBackend() {
     try {
       if (mode === "seal") {
-        const outcome = await backup(
-          app.nsec,
-          app.masterPassword,
-          app.filePath,
-        );
+        const outcome =
+          app.protectInput === "text"
+            ? await backupText(app.nsec, app.masterPassword, app.secretText)
+            : await backup(app.nsec, app.masterPassword, app.filePath);
         if (cancelled) return;
         app.outcome = outcome;
         clearProtectSecrets();
       } else if (app.recoverMode === "shares") {
-        app.recoveredTo = await recoverWithShares(
+        const recovered = await recoverWithShares(
           app.shareEntries.map((s) => s.trim()).filter(Boolean),
         );
         if (cancelled) return;
-        clearRecoverSecrets();
+        app.recovered = recovered;
+        // A text backup can be edited and re-saved, which needs these
+        // credentials again, so keep them until the user leaves recovery
+        // (resetRecover wipes them). A file recovery is finished — wipe now.
+        if (recovered.kind === "file") clearRecoverSecrets();
       } else {
-        app.recoveredTo = await recoverWithPassword(
+        const recovered = await recoverWithPassword(
           app.recoverNsec,
           app.recoverPassword,
         );
         if (cancelled) return;
-        clearRecoverSecrets();
+        app.recovered = recovered;
+        if (recovered.kind === "file") clearRecoverSecrets();
       }
       backendDone = true;
       maybeFinish();

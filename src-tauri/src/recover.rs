@@ -19,12 +19,25 @@ use crate::crypto::kdf::{self, KdfParams};
 use crate::crypto::slip39;
 use crate::error::{Error, Result};
 use crate::manifest::Manifest;
-use crate::metadata::{self, BackupDescriptor, Filename};
+use crate::metadata::{self, BackupDescriptor, ContentKind, Filename};
 use crate::relay::MetadataStore;
 use crate::secret::{DerivedKey, MasterKey, Password};
 
-/// Recover using the master key and password, writing the recovered file into
-/// `output_dir` under its original name. Returns the path it was written to.
+/// The outcome of a recovery, in the form the backup was stored in.
+///
+/// A text backup comes back in memory so the app can show and edit it; a file
+/// backup is streamed to disk and located by path. Because it can hold recovered
+/// plaintext, it deliberately has no `Debug` — like
+/// [`BackupOutcome`](crate::backup::BackupOutcome), it must never be logged.
+pub enum Recovered {
+    /// A file backup, decrypted and written to this path.
+    File(PathBuf),
+    /// A text backup, decrypted into memory under its fixed name.
+    Text { filename: Filename, content: String },
+}
+
+/// Recover using the master key and password. A file backup is written into
+/// `output_dir` under its original name; a text backup is returned in memory.
 pub async fn recover_with_password<F, M>(
     master_nsec: &str,
     password: &str,
@@ -33,7 +46,7 @@ pub async fn recover_with_password<F, M>(
     blob_factory: &F,
     metadata_store: &M,
     output_dir: &Path,
-) -> Result<PathBuf>
+) -> Result<Recovered>
 where
     F: BlobStoreFactory,
     M: MetadataStore,
@@ -44,14 +57,15 @@ where
 }
 
 /// Recover using a quorum of Shamir shares (the master key and password are not
-/// needed), writing the recovered file into `output_dir` under its original name.
+/// needed). A file backup is written into `output_dir` under its original name;
+/// a text backup is returned in memory.
 pub async fn recover_with_shares<F, M>(
     mnemonics: &[String],
     manifest: Option<&Manifest>,
     blob_factory: &F,
     metadata_store: &M,
     output_dir: &Path,
-) -> Result<PathBuf>
+) -> Result<Recovered>
 where
     F: BlobStoreFactory,
     M: MetadataStore,
@@ -67,7 +81,7 @@ async fn recover<F, M>(
     blob_factory: &F,
     metadata_store: &M,
     output_dir: &Path,
-) -> Result<PathBuf>
+) -> Result<Recovered>
 where
     F: BlobStoreFactory,
     M: MetadataStore,
@@ -76,9 +90,23 @@ where
     let file_key = kdf::derive_file_key(derived)?;
     let blob = download(&descriptor, blob_factory).await?;
 
-    write_atomically(output_dir, &descriptor.filename, |file| {
-        cipher::decrypt(&file_key, &blob, file)
-    })
+    match descriptor.kind {
+        ContentKind::File => {
+            let path = write_atomically(output_dir, &descriptor.filename, |file| {
+                cipher::decrypt(&file_key, &blob, file)
+            })?;
+            Ok(Recovered::File(path))
+        }
+        ContentKind::Text => {
+            let mut plaintext = Vec::new();
+            cipher::decrypt(&file_key, &blob, &mut plaintext)?;
+            let content = String::from_utf8(plaintext).map_err(|_| Error::NotUtf8Text)?;
+            Ok(Recovered::Text {
+                filename: descriptor.filename,
+                content,
+            })
+        }
+    }
 }
 
 /// How many numbered variants of a name to try before giving up. Reaching this
@@ -222,7 +250,7 @@ mod tests {
         outcome: BackupOutcome,
     }
 
-    async fn backed_up() -> Fixture {
+    async fn back_up(plaintext: &[u8], filename: Filename, kind: ContentKind) -> Fixture {
         let nsec = Keys::generate().secret_key().to_secret_hex();
         let password = "correct horse battery staple".to_string();
         let network = FakeBlobNetwork::new();
@@ -232,8 +260,9 @@ mod tests {
         let derived = kdf::derive(&master, &Password::new(password.clone()), &fast_kdf()).unwrap();
         let outcome = run_backup(
             &derived,
-            Cursor::new(PLAINTEXT.to_vec()),
-            Filename::parse(FILENAME).unwrap(),
+            Cursor::new(plaintext.to_vec()),
+            filename,
+            kind,
             &["https://blossom.one".into()],
             2,
             3,
@@ -253,10 +282,58 @@ mod tests {
         }
     }
 
+    async fn backed_up() -> Fixture {
+        back_up(
+            PLAINTEXT,
+            Filename::parse(FILENAME).unwrap(),
+            ContentKind::File,
+        )
+        .await
+    }
+
     /// True when `dir` holds no entries — proof that a failed recovery left
     /// neither an output file nor a leftover temporary one.
     fn is_empty(dir: &Path) -> bool {
         std::fs::read_dir(dir).unwrap().next().is_none()
+    }
+
+    /// Unwrap a recovery expected to be a file, returning the path it landed at.
+    fn recovered_file(recovered: Recovered) -> PathBuf {
+        match recovered {
+            Recovered::File(path) => path,
+            Recovered::Text { .. } => panic!("expected a file recovery, got text"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_text_backup_recovers_as_in_memory_text_and_writes_nothing() {
+        const TEXT: &str = "dear family, the recipe is two eggs and a pinch of love";
+        let f = back_up(TEXT.as_bytes(), Filename::text_backup(), ContentKind::Text).await;
+        let out = tempfile::tempdir().unwrap();
+
+        let recovered = recover_with_password(
+            &f.nsec,
+            &f.password,
+            &fast_kdf(),
+            None,
+            &f.network,
+            &f.relays,
+            out.path(),
+        )
+        .await
+        .unwrap();
+
+        match recovered {
+            Recovered::Text { filename, content } => {
+                assert_eq!(filename.as_str(), "nanavault-secret-file.txt");
+                assert_eq!(content, TEXT);
+            }
+            Recovered::File(path) => panic!("expected text, got a file at {path:?}"),
+        }
+        assert!(
+            is_empty(out.path()),
+            "a text recovery must write nothing to disk"
+        );
     }
 
     #[tokio::test]
@@ -264,7 +341,7 @@ mod tests {
         let f = backed_up().await;
         let out = tempfile::tempdir().unwrap();
 
-        let path = recover_with_password(
+        let recovered = recover_with_password(
             &f.nsec,
             &f.password,
             &fast_kdf(),
@@ -275,6 +352,7 @@ mod tests {
         )
         .await
         .unwrap();
+        let path = recovered_file(recovered);
 
         assert_eq!(path, out.path().join(FILENAME));
         assert_eq!(std::fs::read(&path).unwrap(), PLAINTEXT);
@@ -286,7 +364,7 @@ mod tests {
         let empty_relays = FakeRelays::new(vec!["wss://relay.dead".into()]);
         let out = tempfile::tempdir().unwrap();
 
-        let path = recover_with_password(
+        let recovered = recover_with_password(
             &f.nsec,
             &f.password,
             &fast_kdf(),
@@ -297,6 +375,7 @@ mod tests {
         )
         .await
         .unwrap();
+        let path = recovered_file(recovered);
 
         assert_eq!(std::fs::read(&path).unwrap(), PLAINTEXT);
     }
@@ -307,9 +386,10 @@ mod tests {
         let quorum = f.outcome.shares[..2].to_vec();
         let out = tempfile::tempdir().unwrap();
 
-        let path = recover_with_shares(&quorum, None, &f.network, &f.relays, out.path())
+        let recovered = recover_with_shares(&quorum, None, &f.network, &f.relays, out.path())
             .await
             .unwrap();
+        let path = recovered_file(recovered);
 
         assert_eq!(path, out.path().join(FILENAME));
         assert_eq!(std::fs::read(&path).unwrap(), PLAINTEXT);
@@ -322,7 +402,7 @@ mod tests {
         let taken = out.path().join(FILENAME);
         std::fs::write(&taken, b"the original, untouched").unwrap();
 
-        let path = recover_with_password(
+        let recovered = recover_with_password(
             &f.nsec,
             &f.password,
             &fast_kdf(),
@@ -333,6 +413,7 @@ mod tests {
         )
         .await
         .unwrap();
+        let path = recovered_file(recovered);
 
         // The recovered file lands beside the original under a numbered name,
         // keeping its extension; the original is left exactly as it was.
@@ -348,7 +429,7 @@ mod tests {
         std::fs::write(out.path().join("secret-notes.txt"), b"first").unwrap();
         std::fs::write(out.path().join("secret-notes (1).txt"), b"second").unwrap();
 
-        let path = recover_with_password(
+        let recovered = recover_with_password(
             &f.nsec,
             &f.password,
             &fast_kdf(),
@@ -359,6 +440,7 @@ mod tests {
         )
         .await
         .unwrap();
+        let path = recovered_file(recovered);
 
         assert_eq!(path, out.path().join("secret-notes (2).txt"));
         assert_eq!(std::fs::read(&path).unwrap(), PLAINTEXT);

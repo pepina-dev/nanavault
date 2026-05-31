@@ -38,6 +38,13 @@ pub enum Error {
     #[error("malformed encrypted blob: {0}")]
     BlobFormat(String),
 
+    /// A text backup decrypted to bytes that are not valid UTF-8. Practically
+    /// unreachable — the app only ever stores UTF-8 as text and the AEAD
+    /// guarantees integrity — but the decode is fallible, so it gets an honest
+    /// error rather than a panic.
+    #[error("the recovered text was not valid UTF-8")]
+    NotUtf8Text,
+
     /// A downloaded blob did not hash to the value we were looking for.
     #[error("integrity check failed: expected {expected}, got {actual}")]
     IntegrityMismatch { expected: String, actual: String },
@@ -50,6 +57,10 @@ pub enum Error {
     /// not stand in as a single, safe destination name.
     #[error("invalid file name: {0}")]
     InvalidFilename(String),
+
+    /// Typed text exceeded the size limit for an in-app text backup.
+    #[error("the text is too large: the limit is {limit} bytes")]
+    TextTooLarge { limit: usize },
 
     /// Building or reading the encrypted pointer event failed.
     #[error("backup pointer error: {0}")]

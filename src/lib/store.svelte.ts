@@ -1,4 +1,4 @@
-import type { BackupOutcome } from "./api";
+import type { BackupOutcome, Recovered } from "./api";
 import { SHARE_COUNT, THRESHOLD } from "./api";
 
 export type Screen =
@@ -16,6 +16,10 @@ export type Screen =
   | "recover-success";
 
 export type RecoverMode = "shares" | "password";
+
+// Where the secret to protect comes from: a file picked from disk, or text the
+// user types directly into the app (then stored under a fixed name).
+export type ProtectInput = "file" | "text";
 
 // How the user chooses to be able to recover on their own:
 //  - "easy":     we mint a backup code (an nsec) for them; password optional.
@@ -47,8 +51,10 @@ export const app = $state({
   screen: "home" as Screen,
 
   // protect flow
+  protectInput: "file" as ProtectInput,
   filePath: "",
   fileName: "",
+  secretText: "", // text-input mode: the secret typed directly into the app
   recoveryMode: "easy" as RecoveryMode,
   nsec: "",
   masterPassword: "",
@@ -62,7 +68,9 @@ export const app = $state({
   shareEntries: freshShareEntries(),
   recoverNsec: "",
   recoverPassword: "",
-  recoveredTo: "", // temp path the recovered file lands in before the user saves it
+  // What the recovery produced: a file written to a temp path, or text held in
+  // memory for display and editing. Null until a recovery succeeds.
+  recovered: null as Recovered | null,
 });
 
 export function go(screen: Screen) {
@@ -70,8 +78,10 @@ export function go(screen: Screen) {
 }
 
 export function resetProtect() {
+  app.protectInput = "file";
   app.filePath = "";
   app.fileName = "";
+  app.secretText = "";
   app.recoveryMode = "easy";
   app.nsec = "";
   app.masterPassword = "";
@@ -86,7 +96,7 @@ export function resetRecover() {
   app.shareEntries = freshShareEntries();
   app.recoverNsec = "";
   app.recoverPassword = "";
-  app.recoveredTo = "";
+  app.recovered = null;
 }
 
 // Wipe just the secrets once a flow has finished with them, so they don't sit
@@ -97,6 +107,7 @@ export function clearProtectSecrets() {
   app.nsec = "";
   app.masterPassword = "";
   app.backupCode = "";
+  app.secretText = "";
 }
 
 export function clearRecoverSecrets() {

@@ -8,7 +8,11 @@
   const hints = $derived(
     app.guardians.map((g) => g.hint.trim()).filter(Boolean),
   );
-  const fileName = $derived(app.fileName);
+  const isText = $derived(app.protectInput === "text");
+  // The noun for the protected thing, and the bolded subject of the success
+  // line: a file has its name; a typed secret has none, so it gets a stand-in.
+  const subjectNoun = $derived(isText ? "secret" : "file");
+  const subject = $derived(isText ? "Your secret" : app.fileName);
 
   // Easy mode "protects"; advanced mode "encrypts".
   const sealedAdj = $derived(
@@ -29,9 +33,9 @@
     ><Icon name="check" size={13} stroke={2.6} /> {sealedAdj} &amp; safe</span
   >
 
-  <h1 style="margin-top:14px;">Your file is safe.</h1>
+  <h1 style="margin-top:14px;">Your {subjectNoun} is safe.</h1>
   <p class="lead">
-    <strong style="color:var(--fg);">{fileName}</strong>
+    <strong style="color:var(--fg);">{subject}</strong>
     is {sealedAdj.toLowerCase()} and split into
     {SHARE_COUNT} keys shared with people you trust.
   </p>
@@ -70,7 +74,7 @@
       ><Icon name="recover" size={20} /></span
     >
     <span>
-      If you ever lose your file, just ask any
+      If you ever lose your {subjectNoun}, just ask any
       <b>{THRESHOLD} of those {SHARE_COUNT} people</b> for the key you gave
       them, then follow the <b>“Recover secret file”</b> path. I'll put it back together
       for you.

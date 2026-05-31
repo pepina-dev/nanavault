@@ -18,13 +18,40 @@ export interface BackupOutcome {
   manifest: Manifest;
 }
 
+/** What a content update returns: the new blob hash and the refreshed manifest.
+ *  No shares — re-saving keeps the same identity, so the originals still work. */
+export interface UpdateOutcome {
+  blob_sha256: string;
+  manifest: Manifest;
+}
+
+/** What a recovery produced. A file backup is written to a temp path (then saved
+ *  to a chosen folder via `saveRecovered`); a text backup comes back in memory for
+ *  the app to display, edit, and optionally save via `saveText`. */
+export type Recovered =
+  | { kind: "file"; path: string }
+  | { kind: "text"; filename: string; content: string };
+
 // --- defaults the UI ships with --------------------------------------------
 // TODO(backend): replace with the canonical, known-good relay + Blossom URLs.
 
-export const DEFAULT_RELAYS = ["wss://relay.damus.io", "wss://nos.lol"];
+export const DEFAULT_RELAYS = [
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+  "wss://relay.primal.net",
+];
 export const DEFAULT_SERVERS = ["https://blossom.primal.net"];
 export const THRESHOLD = 2;
 export const SHARE_COUNT = 3;
+
+/** Largest typed-text secret accepted for a text backup, in UTF-8 bytes. Mirrors
+ *  the backend's `MAX_TEXT_BYTES`, which is the authoritative limit. */
+export const MAX_TEXT_BYTES = 10 * 1024 * 1024;
+
+/** The UTF-8 byte length of a string — the unit the size limit is measured in. */
+export function textBytes(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
 
 // --- native pickers (replace the File API + base64 pipeline) ---------------
 
@@ -73,18 +100,36 @@ export function backup(
   });
 }
 
+/** Text-input counterpart to `backup`: encrypt typed text under the fixed
+ *  text-backup name, with the same relay/server/threshold defaults. */
+export function backupText(
+  nsec: string,
+  password: string,
+  text: string,
+): Promise<BackupOutcome> {
+  return invoke<BackupOutcome>("backup_text", {
+    nsec,
+    password,
+    text,
+    relays: DEFAULT_RELAYS,
+    servers: DEFAULT_SERVERS,
+    threshold: THRESHOLD,
+    shareCount: SHARE_COUNT,
+  });
+}
+
 export function exportManifest(manifest: Manifest, path: string): Promise<void> {
   return invoke<void>("export_manifest", { manifest, path });
 }
 
-/** Recover the file to a temporary location and return that path. The user
- *  picks where to keep it afterwards via `saveRecovered`. */
+/** Recover a backup. A file backup comes back as a temp path (then saved to a
+ *  chosen folder via `saveRecovered`); a text backup comes back in memory. */
 export function recoverWithPassword(
   nsec: string,
   password: string,
   manifestPath?: string,
-): Promise<string> {
-  return invoke<string>("recover_with_password", {
+): Promise<Recovered> {
+  return invoke<Recovered>("recover_with_password", {
     nsec,
     password,
     relays: DEFAULT_RELAYS,
@@ -92,16 +137,46 @@ export function recoverWithPassword(
   });
 }
 
-/** Recover the file to a temporary location and return that path. The user
- *  picks where to keep it afterwards via `saveRecovered`. */
+/** Recover a backup from a quorum of shares. A file backup comes back as a temp
+ *  path (saved via `saveRecovered`); a text backup comes back in memory. */
 export function recoverWithShares(
   shares: string[],
   manifestPath?: string,
-): Promise<string> {
-  return invoke<string>("recover_with_shares", {
+): Promise<Recovered> {
+  return invoke<Recovered>("recover_with_shares", {
     shares,
     relays: DEFAULT_RELAYS,
     manifestPath: manifestPath ?? null,
+  });
+}
+
+/** Re-encrypt edited text and republish the pointer under the same identity,
+ *  reached with the master key and password. The shares stay valid. */
+export function resaveTextWithPassword(
+  nsec: string,
+  password: string,
+  text: string,
+): Promise<UpdateOutcome> {
+  return invoke<UpdateOutcome>("resave_text_with_password", {
+    nsec,
+    password,
+    text,
+    relays: DEFAULT_RELAYS,
+    servers: DEFAULT_SERVERS,
+  });
+}
+
+/** Re-encrypt edited text and republish the pointer under the same identity,
+ *  reached with a quorum of shares. */
+export function resaveTextWithShares(
+  shares: string[],
+  text: string,
+): Promise<UpdateOutcome> {
+  return invoke<UpdateOutcome>("resave_text_with_shares", {
+    shares,
+    text,
+    relays: DEFAULT_RELAYS,
+    servers: DEFAULT_SERVERS,
   });
 }
 
@@ -112,4 +187,10 @@ export function saveRecovered(
   outputDir: string,
 ): Promise<string> {
   return invoke<string>("save_recovered", { sourcePath, outputDir });
+}
+
+/** Write recovered or edited text into a chosen folder under the fixed
+ *  text-backup name (never overwriting an existing file). Returns the path. */
+export function saveText(content: string, outputDir: string): Promise<string> {
+  return invoke<string>("save_text", { content, outputDir });
 }

@@ -73,7 +73,7 @@ impl Manifest {
 mod tests {
     use super::*;
     use crate::crypto::cipher::BlobHash;
-    use crate::metadata::Filename;
+    use crate::metadata::{ContentKind, Filename};
     use nostr::Keys;
 
     fn manifest() -> Manifest {
@@ -81,6 +81,7 @@ mod tests {
             BlobHash::of(b"ciphertext"),
             vec!["https://blossom.example".into()],
             Filename::parse("notes.txt").unwrap(),
+            ContentKind::File,
         );
         Manifest::new(
             descriptor,
@@ -103,11 +104,18 @@ mod tests {
         // Every field, at the top level and inside the nested descriptor, must
         // be drawn from these non-secret allowlists. If anyone ever adds a
         // secret field, this fails.
-        const ALLOWED_TOP: &[&str] =
-            &["descriptor", "relays", "derived_pubkey", "blob_size", "cipher", "kdf"];
-        const ALLOWED_DESCRIPTOR: &[&str] = &["v", "blob_sha256", "servers", "filename"];
+        const ALLOWED_TOP: &[&str] = &[
+            "descriptor",
+            "relays",
+            "derived_pubkey",
+            "blob_size",
+            "cipher",
+            "kdf",
+        ];
+        const ALLOWED_DESCRIPTOR: &[&str] = &["v", "blob_sha256", "servers", "filename", "kind"];
 
-        let value: serde_json::Value = serde_json::from_str(&manifest().to_json().unwrap()).unwrap();
+        let value: serde_json::Value =
+            serde_json::from_str(&manifest().to_json().unwrap()).unwrap();
         let object = value.as_object().expect("manifest serializes to an object");
         for key in object.keys() {
             assert!(
