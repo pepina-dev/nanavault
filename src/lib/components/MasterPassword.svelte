@@ -39,7 +39,7 @@
   {:else}
     <p class="lead">
       Your secret key and this password combine into the one key that encrypts
-      your file. Pick something only you know and will remember.
+      your secret. Pick something only you know and will remember.
     </p>
   {/if}
 

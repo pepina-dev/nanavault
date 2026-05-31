@@ -76,7 +76,7 @@
     <span>
       If you ever lose your {subjectNoun}, just ask any
       <b>{THRESHOLD} of those {SHARE_COUNT} people</b> for the key you gave
-      them, then follow the <b>“Recover secret file”</b> path. I'll put it back together
+      them, then follow the <b>“Recover secret”</b> path. I'll put it back together
       for you.
     </span>
   </div>

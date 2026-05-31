@@ -51,11 +51,13 @@
     {
       icon: "key",
       label: "Putting the keys together",
-      sub: decrypting ? "From your code and password" : "Combining your friends' pieces",
+      sub: decrypting
+        ? "From your code and password"
+        : "Combining your friends' pieces",
     },
     {
       icon: "search",
-      label: "Finding your file",
+      label: "Finding your secret",
       sub: "Reading the protected note",
     },
     {
@@ -91,8 +93,8 @@
     const detail = e instanceof Error ? e.message : String(e);
     const lead =
       mode === "seal"
-        ? `I couldn't finish ${sealVerb.toLowerCase()} your file, dear.`
-        : "I couldn't put your file back together, dear.";
+        ? `I couldn't finish ${sealVerb.toLowerCase()} your secret, dear.`
+        : "I couldn't put your secret back together, dear.";
     return `${lead} (${detail})`;
   }
 

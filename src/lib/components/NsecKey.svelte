@@ -17,7 +17,7 @@
   />
 
   <h2>Add your secret key</h2>
-  <p class="lead">Your nostr private key is used to encrypt this file.</p>
+  <p class="lead">Your nostr private key is used to encrypt this secret.</p>
 
   <div style="margin-top: 20px;">
     <SecretField
@@ -31,7 +31,7 @@
 
   <div style="margin-top: 20px;">
     <ReassureNote icon="shield">
-      This key is only used to protect <b>this one file</b>
+      This key is only used to protect <b>this one secret</b>
       and then it is erased.
     </ReassureNote>
   </div>

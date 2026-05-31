@@ -55,9 +55,9 @@
 
   <h2>Here is your backup code</h2>
   <p class="lead">
-    This is a list of words — the key to your file, just like the codes your
+    This is a list of words — the key to your secret, just like the codes your
     people get. Keep it somewhere safe: write it down or save it in a password
-    manager. If you ever lose it, your people can still bring the file back.
+    manager. If you ever lose it, your people can still bring the secret back.
   </p>
 
   {#if loading}
@@ -102,8 +102,8 @@
 
     <div style="margin-top:16px;">
       <ReassureNote icon="shield">
-        I never keep this code. Once your file is protected, it's wiped from the
-        app — only your copy remains.
+        I never keep this code. Once your secret is protected, it's wiped from
+        the app — only your copy remains.
       </ReassureNote>
     </div>
 
@@ -113,7 +113,7 @@
       disabled={!app.backupCodeSaved}
       onclick={next}
     >
-      Protect my file <Icon name="lock" />
+      Protect my secret <Icon name="lock" />
     </button>
   {/if}
 </div>
