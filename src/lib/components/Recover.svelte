@@ -31,10 +31,10 @@
 </script>
 
 <div class="card">
-  <FlowHeader label="Recover a file" onBack={() => go("home")} />
+  <FlowHeader label="Recover a secret" onBack={() => go("home")} />
 
   <div class="icon-badge"><Icon name="recover" size={26} /></div>
-  <h2>Bring your secret file back</h2>
+  <h2>Bring your secret back</h2>
 
   <!-- mode toggle -->
   <div class="seg" style="margin-top:16px;">
@@ -61,7 +61,7 @@
     <div style="margin-top:16px;">
       <ReassureNote icon="heart" color="var(--rose)">
         One person's key can't open anything. It takes <b>any {THRESHOLD}</b> together
-        to bring your file back.
+        to bring your secret back.
       </ReassureNote>
     </div>
 
@@ -96,7 +96,7 @@
   {:else}
     <p class="lead" style="margin-top:18px;">
       Enter the <strong>backup code</strong> you saved (or your own nsec), plus
-      its <strong>password</strong> and I'll bring the file back on my own.
+      its <strong>password</strong> and I'll bring the secret back on my own.
     </p>
     <div
       style="margin-top: 18px; display:flex; flex-direction:column; gap:14px;"
@@ -129,6 +129,6 @@
     disabled={!canRecover}
     onclick={start}
   >
-    <Icon name="sparkles" /> Bring my file back
+    <Icon name="sparkles" /> Bring my secret back
   </button>
 </div>

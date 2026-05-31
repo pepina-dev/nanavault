@@ -61,9 +61,9 @@
 
   {#if shares.length < SHARE_COUNT}
     <div class="icon-badge"><Icon name="users" size={26} /></div>
-    <h2>Let's {protectVerb} your file first</h2>
+    <h2>Let's {protectVerb} your secret first</h2>
     <p class="lead">
-      We need to {protectVerb} your file before handing out keys.
+      We need to {protectVerb} your secret before handing out keys.
     </p>
     <button
       class="btn"
@@ -77,8 +77,8 @@
     <p class="lead">
       Each person gets one <strong>recovery code</strong> — a list of words.
       Read it out or copy it across however you trust most. Any
-      <strong>{THRESHOLD} of {SHARE_COUNT}</strong> can bring your secret file back
-      — one alone can't.
+      <strong>{THRESHOLD} of {SHARE_COUNT}</strong> can bring your secret back —
+      one alone can't.
     </p>
 
     <div class="stack" style="gap: 11px; margin-top: 22px;">

@@ -23,10 +23,10 @@
 
   <div class="stack" style="margin-top: 26px;">
     <button class="btn" onclick={startProtect}>
-      <Icon name="lock" /> Protect secret file
+      <Icon name="lock" /> Protect a secret
     </button>
     <button class="btn btn-ghost" onclick={startRecover}>
-      <Icon name="recover" /> Recover secret file
+      <Icon name="recover" /> Recover a secret
     </button>
   </div>
 </div>

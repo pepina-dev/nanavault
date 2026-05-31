@@ -66,7 +66,7 @@
         <p class="lead">Your {broughtBack} file is saved and ready to open.</p>
       {:else}
         <h1>Got it back!</h1>
-        <p class="lead">Your file is {broughtBack} and ready.</p>
+        <p class="lead">Your secret is {broughtBack} and ready.</p>
       {/if}
       <div style="display:flex; justify-content:center; margin:18px 0;">
         <FileChip name={fileName} />
