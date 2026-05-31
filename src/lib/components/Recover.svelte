@@ -129,6 +129,6 @@
     disabled={!canRecover}
     onclick={start}
   >
-    <Icon name="sparkles" /> Bring my file back
+    <Icon name="sparkles" /> Bring my secret back
   </button>
 </div>

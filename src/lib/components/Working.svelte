@@ -71,7 +71,7 @@
   const title = $derived(
     mode === "seal"
       ? `${sealVerb} your ${sealNoun}…`
-      : `${recoverVerb} your file…`,
+      : `${recoverVerb} your secret…`,
   );
 
   // The step animation below is cosmetic — the backend runs as one opaque call
