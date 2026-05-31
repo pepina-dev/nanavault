@@ -132,33 +132,3 @@
     <Icon name="sparkles" /> Bring my file back
   </button>
 </div>
-
-<style>
-  .seg {
-    display: flex;
-    gap: 6px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    padding: 4px;
-  }
-  .seg-btn {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    padding: 10px 8px;
-    border: none;
-    background: transparent;
-    border-radius: calc(var(--r-md) - 4px);
-    font-weight: 700;
-    font-size: 0.88rem;
-    color: var(--fg-muted);
-    cursor: pointer;
-  }
-  .seg-btn.on {
-    background: var(--fg);
-    color: var(--bg);
-  }
-</style>

@@ -38,12 +38,14 @@ pub struct Filename(String);
 /// that common filesystems impose on a single component.
 const MAX_FILENAME_LEN: usize = 255;
 
+/// The fixed name a typed-text backup is stored and recovered under. A known-valid
+/// constant (pinned by a test), so [`Filename::text_backup`] can build it directly.
+const TEXT_BACKUP_NAME: &str = "nanavault-secret-file.txt";
+
 impl Filename {
     /// Validate `value` as a standalone file name.
     pub fn parse(value: &str) -> Result<Self> {
-        let reject = |reason: &str| {
-            Err(Error::InvalidFilename(format!("{value:?}: {reason}")))
-        };
+        let reject = |reason: &str| Err(Error::InvalidFilename(format!("{value:?}: {reason}")));
 
         if value.is_empty() {
             return reject("must not be empty");
@@ -76,6 +78,12 @@ impl Filename {
         Self::parse(name)
     }
 
+    /// The fixed name used for a backup typed directly into the app, rather than
+    /// chosen from the filesystem.
+    pub fn text_backup() -> Self {
+        Self(TEXT_BACKUP_NAME.to_owned())
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -92,6 +100,20 @@ impl<'de> Deserialize<'de> for Filename {
         let value = String::deserialize(deserializer)?;
         Self::parse(&value).map_err(serde::de::Error::custom)
     }
+}
+
+/// Whether a backup holds a file the user chose or text they typed into the app.
+///
+/// Recovery consumes this to decide how to hand the secret back: a file is written
+/// to disk, while text is returned in memory for the app to display and edit.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ContentKind {
+    /// A file chosen from the filesystem, restored under its original name.
+    #[default]
+    File,
+    /// Text typed into the app, stored under [`Filename::text_backup`].
+    Text,
 }
 
 /// Everything recovery needs from the pointer: *where* the blob lives, *which*
@@ -114,15 +136,25 @@ pub struct BackupDescriptor {
     pub servers: Vec<String>,
     /// The original name of the backed-up file, restored on recovery.
     pub filename: Filename,
+    /// Whether the backup holds a file or typed text. Absent in pointers written
+    /// before this field existed, which are — correctly — file backups.
+    #[serde(default)]
+    pub kind: ContentKind,
 }
 
 impl BackupDescriptor {
-    pub fn new(blob_sha256: BlobHash, servers: Vec<String>, filename: Filename) -> Self {
+    pub fn new(
+        blob_sha256: BlobHash,
+        servers: Vec<String>,
+        filename: Filename,
+        kind: ContentKind,
+    ) -> Self {
         Self {
             v: DESCRIPTOR_VERSION,
             blob_sha256,
             servers,
             filename,
+            kind,
         }
     }
 }
@@ -183,6 +215,7 @@ mod tests {
             BlobHash::of(b"some encrypted blob"),
             vec!["https://blossom.example".into()],
             Filename::parse("my-secret-file.txt").unwrap(),
+            ContentKind::File,
         )
     }
 
@@ -240,6 +273,15 @@ mod tests {
     }
 
     #[test]
+    fn the_text_backup_name_is_a_valid_filename() {
+        let name = Filename::text_backup();
+        assert_eq!(name.as_str(), "nanavault-secret-file.txt");
+        // The constructor builds the name directly; this pins that it would also
+        // satisfy the validator, so the two can never silently drift apart.
+        assert_eq!(Filename::parse(name.as_str()).unwrap(), name);
+    }
+
+    #[test]
     fn a_filename_serializes_as_a_bare_string() {
         let json = serde_json::to_string(&Filename::parse("a.txt").unwrap()).unwrap();
         assert_eq!(json, r#""a.txt""#);
@@ -259,6 +301,37 @@ mod tests {
         let parsed = parse_pointer(&event, &key).unwrap();
 
         assert_eq!(parsed, original);
+    }
+
+    #[test]
+    fn a_text_descriptor_round_trips_through_an_event() {
+        let key = derived_key();
+        let original = BackupDescriptor::new(
+            BlobHash::of(b"encrypted text blob"),
+            vec!["https://blossom.example".into()],
+            Filename::text_backup(),
+            ContentKind::Text,
+        );
+
+        let event = build_pointer(&original, &key).unwrap();
+        let parsed = parse_pointer(&event, &key).unwrap();
+
+        assert_eq!(parsed.kind, ContentKind::Text);
+        assert_eq!(parsed, original);
+    }
+
+    #[test]
+    fn a_descriptor_written_before_kind_existed_recovers_as_a_file() {
+        // A pointer or manifest serialized before the `kind` field was added has
+        // no `kind` key; it must read back as a file backup, never fail to parse.
+        let hash = BlobHash::of(b"legacy blob").to_hex();
+        let json = format!(
+            r#"{{"v":1,"blob_sha256":"{hash}","servers":["https://blossom.example"],"filename":"old.txt"}}"#
+        );
+
+        let descriptor: BackupDescriptor = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(descriptor.kind, ContentKind::File);
     }
 
     #[test]

@@ -59,8 +59,11 @@ The known limitations:
   matches.
 - **Webview boundary.** The `nsec` and password are typed into the UI and briefly
   cross into the Rust core through a Tauri command, so they pass through the
-  webview's memory. The Rust side holds them in zeroizing wrappers, never
-  persists or logs them, and wipes them on return.
+  webview's memory. In the type-text flow the secret *content* does too — both
+  on the way in (the text you type) and on the way out (a recovered text backup
+  is shown in the app for reading and editing). The Rust side holds the
+  credentials in zeroizing wrappers, never persists or logs them, and wipes them
+  on return; recovered text lives in the webview only until you leave the screen.
 
 ## How the cryptography works
 
@@ -84,8 +87,9 @@ This all runs in the Rust backend, never in the webview.
   verifies before decryption.
 - **Pointer event.** A replaceable nostr event (kind `10909`) authored by the
   derived key, whose content is a NIP-44 self-encrypted JSON record of the blob
-  hash, size, servers, cipher, and KDF parameters. A relay observer learns only
-  that some key published one small encrypted event.
+  hash, the servers, the file name, and whether the backup is a file or typed
+  text. A relay observer learns only that some key published one small encrypted
+  event.
 - **Shamir sharing.** SLIP-0039, implemented from scratch: a single
   `threshold`-of-`count` group with an empty passphrase (the share path must
   never require anything to remember). The recovery (combine) direction is
@@ -126,18 +130,34 @@ src-tauri/src/
 
 - `backup(nsec, password, file_path, relays, servers, threshold, share_count)` →
   `{ derived_npub, blob_sha256, shares, manifest }`
+- `backup_text(nsec, password, text, relays, servers, threshold, share_count)` →
+  the same outcome, for text typed into the app instead of a chosen file.
+- `generate_backup_code()` → a fresh SLIP-0039 backup code (the easy-mode identity).
 - `export_manifest(manifest, path)` — write the recovery manifest to disk.
-- `recover_with_password(nsec, password, output_path, relays, manifest_path?)`
-- `recover_with_shares(shares, output_path, relays, manifest_path?)`
+- `recover_with_password(nsec, password, relays, manifest_path?)` and
+  `recover_with_shares(shares, relays, manifest_path?)` → a `Recovered`: either a
+  file written to a private temp dir (`{ kind: "file", path }`) or a text backup
+  held in memory (`{ kind: "text", filename, content }`).
+- `resave_text_with_password(nsec, password, text, relays, servers)` and
+  `resave_text_with_shares(shares, text, relays, servers)` → `{ blob_sha256,
+  manifest }`. Re-encrypt edited text and republish the pointer under the same
+  identity; the shares are unchanged, so none are produced.
+- `save_recovered(source_path, output_dir)` and `save_text(content, output_dir)`
+  — write a recovered file, or recovered/edited text, into a chosen folder.
 
 Contracts worth knowing:
 
-- The key argument accepts a bech32 `nsec` **or** a raw hex secret key.
+- The key argument accepts a bech32 `nsec`, a raw hex secret key, or an easy-mode
+  backup code (a 1-of-1 SLIP-0039 mnemonic).
 - `backup` requires `1 ≤ threshold ≤ share_count ≤ 16`, needs at least one
   Blossom server to accept the upload, and records only the servers that did.
 - The `shares` that `backup` returns are secret — distribute them, don't log them.
-- Recovery writes the plaintext to `output_path` (creating/overwriting it) and
-  uses the manifest at `manifest_path` if given, otherwise the relays.
+- Typed text is capped at 10 MiB and stored under `nanavault-secret-file.txt`.
+- Recovery never overwrites: a recovered file lands in a private temp dir to be
+  saved later via `save_recovered`, and a text backup is returned in memory and
+  written to disk (via `save_text`) only if asked. On a name clash, the save
+  becomes `name (1).ext`. Recovery uses the manifest at `manifest_path` if given,
+  otherwise the relays.
 
 ## Tech stack
 
